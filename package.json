@@ -1,0 +1,21 @@
+{
+  "name": "omni-toolbox",
+  "version": "1.0.0",
+  "description": "A modern client-side all-in-one web toolbox featuring video compression and more.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "keywords": [
+    "video-compressor",
+    "ffmpeg-wasm",
+    "client-side",
+    "toolbox",
+    "webassembly"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}

@@ -1,0 +1,5578 @@
+/**
+ * OmniToolbox - Application Logic
+ * Featuring Client-Side Video Compressor utilizing ffmpeg.wasm
+ */
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Check and set global variables
+    const { FFmpeg } = window.FFmpegWASM || {};
+    const { toBlobURL, fetchFile } = window.FFmpegUtil || {};
+
+    let ffmpeg = null;
+    let isFFmpegLoaded = false;
+    let selectedFile = null;
+    let totalDuration = 0; // in seconds
+    let srcVideoWidth = 0;
+    let srcVideoHeight = 0;
+    
+    // Timer variables
+    let startTime = 0;
+    let elapsedTimer = null;
+    let currentPercent = 0;
+
+    // UI Elements
+    const dropZone = document.getElementById('drop-zone');
+    const videoInput = document.getElementById('video-input');
+    const uploadPanel = document.getElementById('upload-panel');
+    const controlPanel = document.getElementById('control-panel');
+    const progressPanel = document.getElementById('progress-panel');
+    const resultPanel = document.getElementById('result-panel');
+    
+    // Elements - Video Player & Meta
+    const srcPreview = document.getElementById('src-preview');
+    const metaName = document.getElementById('meta-name');
+    const metaSize = document.getElementById('meta-size');
+    const metaRes = document.getElementById('meta-resolution');
+    const metaDur = document.getElementById('meta-duration');
+    
+    // Elements - Action Buttons
+    const btnCompress = document.getElementById('btn-compress');
+    const btnChangeVideo = document.getElementById('btn-change-video');
+    const btnDownload = document.getElementById('btn-download');
+    const btnReset = document.getElementById('btn-reset');
+    const btnGoBackVideo = document.getElementById('btn-go-back-video');
+    
+    // Elements - Mode Toggles
+    const toggleCompress = document.getElementById('toggle-compress');
+    const toggleConvert = document.getElementById('toggle-convert');
+    const compressionSettingsBlock = document.getElementById('compression-settings-block');
+    const conversionSettingsBlock = document.getElementById('conversion-settings-block');
+    
+    // Elements - Presets and Configs
+    const resPresets = document.getElementById('resolution-presets');
+    const fpsPresets = document.getElementById('fps-presets');
+    const crfSlider = document.getElementById('crf-slider');
+    const crfValueDisplay = document.getElementById('crf-value-display');
+    const codecSelect = document.getElementById('codec-select');
+    const audioSelect = document.getElementById('audio-select');
+    const engineSelect = document.getElementById('engine-select');
+    
+    // Elements - Progress Indicators
+    const progressCircle = document.getElementById('progress-indicator-circle');
+    const progressPctText = document.getElementById('progress-percentage-text');
+    const progressStatusTitle = document.getElementById('progress-status-title');
+    const progressStatusDesc = document.getElementById('progress-status-desc');
+    const timeElapsedVal = document.getElementById('time-elapsed');
+    const timeRemainingVal = document.getElementById('time-remaining');
+    const processingSpeedVal = document.getElementById('processing-speed');
+    
+    // Elements - Logs Terminal
+    const btnToggleTerminal = document.getElementById('btn-toggle-terminal');
+    const terminalBody = document.getElementById('terminal-body');
+    const terminalChevron = document.getElementById('terminal-chevron');
+    const terminalLogList = document.getElementById('terminal-log-list');
+    
+    // Elements - Results
+    const resOrigVideo = document.getElementById('res-orig-video');
+    const resCompVideo = document.getElementById('res-comp-video');
+    const origResBadge = document.getElementById('orig-res-badge');
+    const compResBadge = document.getElementById('comp-res-badge');
+    const savingPct = document.getElementById('saving-pct');
+    const savingDetail = document.getElementById('saving-detail');
+
+    // Generated blob URL for cleanup
+    let outputVideoUrl = null;
+
+    /* ==========================================================================
+       0. GLOBAL THEME MANAGER (DARK / LIGHT MODE)
+       ========================================================================== */
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        
+        if (savedTheme === 'light' || (!savedTheme && systemPrefersLight)) {
+            document.body.classList.add('light-theme');
+            syncMarkdownTheme('light');
+        } else {
+            document.body.classList.remove('light-theme');
+            syncMarkdownTheme('dark');
+        }
+    }
+    
+    function toggleTheme() {
+        const isCurrentlyLight = document.body.classList.contains('light-theme');
+        if (isCurrentlyLight) {
+            document.body.classList.remove('light-theme');
+            localStorage.setItem('theme', 'dark');
+            syncMarkdownTheme('dark');
+        } else {
+            document.body.classList.add('light-theme');
+            localStorage.setItem('theme', 'light');
+            syncMarkdownTheme('light');
+        }
+    }
+    
+    function syncMarkdownTheme(themeMode) {
+        const readerThemeSelect = document.getElementById('reader-theme-select');
+        const renderedOutput = document.getElementById('rendered-output');
+        
+        if (readerThemeSelect && renderedOutput) {
+            const targetTheme = themeMode === 'light' ? 'github-light' : 'github-dark';
+            const currentVal = readerThemeSelect.value;
+            if (currentVal === 'github-dark' || currentVal === 'github-light') {
+                readerThemeSelect.value = targetTheme;
+                readerThemeSelect.dispatchEvent(new Event('change'));
+            }
+        }
+    }
+    
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+    
+    // Listen for system theme changes dynamically
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+            const savedTheme = localStorage.getItem('theme');
+            // Only update dynamically if user hasn't manually set a preference
+            if (!savedTheme) {
+                if (e.matches) {
+                    document.body.classList.add('light-theme');
+                    syncMarkdownTheme('light');
+                } else {
+                    document.body.classList.remove('light-theme');
+                    syncMarkdownTheme('dark');
+                }
+            }
+        });
+    }
+    
+    initTheme();
+
+    /* ==========================================================================
+       1. ROUTING & STATE NAVIGATION
+       ========================================================================== */
+    const navItems = document.querySelectorAll('.nav-item');
+    const toolTitle = document.getElementById('current-tool-title');
+    const toolDesc = document.getElementById('current-tool-desc');
+    const toolPages = document.querySelectorAll('.tool-page');
+
+    // Mobile Navigation Drawer Toggle Controls
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    const sidebar = document.querySelector('.sidebar');
+
+    function toggleMobileMenu() {
+        if (sidebar && sidebarBackdrop) {
+            sidebar.classList.toggle('open');
+            sidebarBackdrop.classList.toggle('active');
+        }
+    }
+
+    function closeMobileMenu() {
+        if (sidebar && sidebarBackdrop) {
+            sidebar.classList.remove('open');
+            sidebarBackdrop.classList.remove('active');
+        }
+    }
+
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', closeMobileMenu);
+    }
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeMobileMenu();
+            const target = item.getAttribute('data-target');
+            
+            // Switch Nav Highlight
+            navItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            // Hide all pages
+            toolPages.forEach(p => p.classList.remove('active'));
+            
+            if (target === 'coming-soon') {
+                const toolName = item.getAttribute('data-tool');
+                document.getElementById('coming-soon-page').classList.add('active');
+                
+                // Set Placeholder Titles
+                toolTitle.innerText = toolName;
+                toolDesc.innerText = `前端 ${toolName} 功能正在全力研发中...`;
+                
+                document.getElementById('placeholder-title').innerText = `${toolName} 即将推出`;
+                document.getElementById('placeholder-desc').innerText = `这是“极客万能工具箱”规划中的下一个核心工具，所有操作都将直接在您的浏览器本地处理，安全可靠。敬请期待！`;
+                
+                const emojiMap = {
+                    'PDF 工具箱': '📝',
+                    '开发者实用工具': '🛠️'
+                };
+                document.getElementById('placeholder-emoji').innerText = emojiMap[toolName] || '🛠️';
+            } else if (target === 'markdown-latex-reader') {
+                document.getElementById('markdown-latex-reader-page').classList.add('active');
+                toolTitle.innerText = "Markdown + LaTeX 工具";
+                toolDesc.innerText = "标准 Markdown 与 LaTeX 数学公式本地渲染";
+            } else if (target === 'image-converter') {
+                document.getElementById('image-converter-page').classList.add('active');
+                toolTitle.innerText = "图片压缩与格式转换";
+                toolDesc.innerText = "图片压缩、缩放与多种格式互转，本地安全处理";
+            } else if (target === 'audio-converter') {
+                document.getElementById('audio-converter-page').classList.add('active');
+                toolTitle.innerText = "音频格式转换";
+                toolDesc.innerText = "音频本地格式转码，完全离线运行";
+            } else if (target === 'pdf-toolbox') {
+                document.getElementById('pdf-toolbox-page').classList.add('active');
+                toolTitle.innerText = "PDF 工具箱";
+                toolDesc.innerText = "PDF 合并、拆分、防伪水印与图片互转，本地安全处理";
+            } else if (target === 'developer-tools') {
+                document.getElementById('developer-tools-page').classList.add('active');
+                toolTitle.innerText = "开发者实用工具";
+                toolDesc.innerText = "常用开发工具箱，100% 本地离线处理，防泄密";
+                initDevTools();
+            } else {
+                // video-compressor
+                document.getElementById('video-compressor-page').classList.add('active');
+                toolTitle.innerText = "视频压缩与转换";
+                toolDesc.innerText = "高压缩率，保持清晰，支持多种视频格式及 GIF 互转，100% 浏览器本地处理，绝不上传云端";
+            }
+        });
+    });
+
+    // Back button in Coming Soon placeholder
+    btnGoBackVideo.addEventListener('click', () => {
+        document.querySelector('[data-target="video-compressor"]').click();
+    });
+
+    /* ==========================================================================
+       2. MARKDOWN + LATEX READER LOGIC
+       ========================================================================== */
+    
+    // Elements
+    const mdTextarea = document.getElementById('markdown-textarea');
+    const renderedOutput = document.getElementById('rendered-output');
+    const fileDisplay = document.getElementById('file-name-display');
+    const fileInput = document.getElementById('reader-file-input');
+    const btnUploadMd = document.getElementById('btn-upload-md');
+    const templateSelect = document.getElementById('sample-template-select');
+    
+    const modeButtons = document.querySelectorAll('.view-mode-selector .mode-btn');
+    const workspaceContainer = document.querySelector('.reader-workspace-container');
+    
+    const btnCopyRaw = document.getElementById('btn-copy-raw');
+    const btnCopyHtml = document.getElementById('btn-copy-html');
+    const btnDownloadMd = document.getElementById('btn-download-md');
+    const btnPrintPdf = document.getElementById('btn-print-pdf');
+    const btnClearEditor = document.getElementById('btn-clear-editor');
+    
+    const themeSelect = document.getElementById('reader-theme-select');
+    const fontsizeSelect = document.getElementById('reader-fontsize-select');
+    const fontfamilySelect = document.getElementById('reader-fontfamily-select');
+    const lineheightSelect = document.getElementById('reader-lineheight-select');
+    const btnToggleToc = document.getElementById('btn-toggle-toc');
+    const docToc = document.getElementById('document-toc');
+    const tocList = document.getElementById('toc-list');
+    
+    const previewSearchInput = document.getElementById('preview-search-input');
+    const searchResultsCount = document.getElementById('search-results-count');
+    
+    const toolbarTools = document.querySelectorAll('.editor-quick-toolbar .toolbar-tool');
+    
+    const statChars = document.getElementById('stat-chars');
+    const statWords = document.getElementById('stat-words');
+    const statParagraphs = document.getElementById('stat-paragraphs');
+    const statReadTime = document.getElementById('stat-read-time');
+
+    // Built-in Templates
+    const templates = {
+        mathDemo: `# LaTeX 数学公式渲染示例\n\n这是一个在浏览器本地渲染的 Markdown + LaTeX 数学文档示例。所有公式均由高效的 KaTeX 引擎渲染。\n\n## 一、行内公式 (Inline Math)\n\n质能方程：$E = mc^2$，其中 $E$ 是能量，$m$ 是质量，$c$ 是光速。\n\n二次方程的求根公式为：$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$。\n\n欧拉公式是数学中最美妙的公式之一：$e^{i\\pi} + 1 = 0$。\n\n## 二、块级公式 (Block Math)\n\n高斯积分公式：\n$$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$\n\n麦克斯韦方程组（微分形式）：\n$$\\begin{aligned}\n\\nabla \\cdot \\mathbf{E} &= \\frac{\\rho}{\\varepsilon_0} \\\\\n\\nabla \\cdot \\mathbf{B} &= 0 \\\\\n\\nabla \\times \\mathbf{E} &= -\\frac{\\partial \\mathbf{B}}{\\partial t} \\\\\n\\nabla \\times \\mathbf{B} &= \\mu_0 \\mathbf{J} + \\mu_0 \\varepsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}\n\\end{aligned}$$\n\n矩阵乘法示例：\n$$\\begin{pmatrix} \na & b \\\\ \nc & d \n\\end{pmatrix} \n\\begin{pmatrix} \nx \\\\ \ny \n\\end{pmatrix} = \n\\begin{pmatrix} \nax + by \\\\ \ncx + dy \n\\end{pmatrix}$$\n\n三维空间中的格林公式：\n$$\\iiint_{V} \\left(\\nabla \\cdot \\mathbf{F}\\right) dV = \\iint_{\\partial V} \\left(\\mathbf{F} \\cdot \\mathbf{n}\\right) dS$$`,
+        
+        academicDemo: `# 深度神经网络在图像识别中的应用研究\n\n## 摘要\n本文探讨了卷积神经网络（CNN）在图像分类任务中的核心架构演变。我们在 MNIST 和 CIFAR-10 数据集上对比了经典 CNN 与残差网络（ResNet）的分类准确率。\n\n## 1. 卷积网络前向传播\n\n卷积层第 $l$ 层的输出特征图可以表示为：\n$$a_j^{[l]} = \\sigma \\left( \\sum_{i \\in M_j} a_i^{[l-1]} * W_{ij}^{[l]} + b_j^{[l]} \\right)$$\n其中 $*$ 表示二维卷积操作，$\\sigma(\\cdot)$ 是激活函数（例如 $\\text{ReLU}(x) = \\max(0, x)$），$W$ 是权重核。\n\n## 2. 损失函数\n对于多分类任务，我们使用交叉熵损失函数：\n$$\\mathcal{L}(\\hat{y}, y) = -\\sum_{k=1}^{K} y_k \\log \\hat{y}_k$$\n\n## 3. 实验数据与对比\n\n| 模型架构 | 参数量 (M) | MNIST 准确率 | CIFAR-10 准确率 |\n| :--- | :---: | :---: | :---: |\n| LeNet-5 | 0.06 | 99.2% | 62.1% |\n| VGG-16 | 138 | 99.6% | 91.5% |\n| ResNet-50 | 25.6 | **99.8%** | **94.8%** |\n\n实验证明，采用残差短路连接：\n$$a^{[l+2]} = g(z^{[l+2]} + a^{[l]})$$\n可以有效解决深层网络中的梯度消失问题。`,
+        
+        markdownGuide: `# Markdown 快速指南\n\n本指南展示了 Markdown 文本阅读器的常用排版效果。\n\n## 一、基本排版\n\n**粗体文本**，*斜体文本*，***粗斜体***，还有~~删除线~~。\n\n> 这是一个漂亮的引用块。\n> 可以在这里放一些醒目的格言或者提示。\n\n## 二、无序与有序列表\n\n无序列表：\n*   主板与处理器\n*   内存与存储\n*   显示卡与显示器\n\n有序列表：\n1.  第一步：载入 Markdown 文件\n2.  第二步：实时预览渲染效果\n3.  第三步：导出为 PDF 或 HTML\n\n## 三、代码排版\n\n行内代码像这样：\`const x = 42;\`。\n\n以下是 JavaScript 代码块：\n\`\`\`javascript\nfunction greet(user) {\n    console.log(\`Hello, \${user}!\`);\n    return true;\n}\ngreet("极客工具箱");\n\`\`\`\n\n## 四、超链接与图片\n\n[访问谷歌](https://www.google.com)\n\n表格支持：\n| 项目 | 状态 | 耗时 |\n| :--- | :---: | :---: |\n| 文本解析 | 已完成 | 3ms |\n| 数学渲染 | 已完成 | 8ms |\n| 页面生成 | 已就绪 | 12ms |`
+    };
+
+    // Parser Pipeline: Marked + KaTeX Integration
+    function parseMarkdownAndMath(rawText) {
+        if (!rawText.trim()) {
+            return `<div class="empty-preview">
+                        <div class="empty-icon">📖</div>
+                        <p>开始在左侧编辑，或者选择上方文件/载入模板进行阅读。</p>
+                    </div>`;
+        }
+
+        if (!window.marked || !window.katex) {
+            return `<div class="empty-preview">
+                        <div class="empty-icon">⏳</div>
+                        <p>正在加载渲染引擎，请稍候...</p>
+                    </div>`;
+        }
+
+        let codeBlocks = [];
+        let blockMath = [];
+        let inlineMath = [];
+
+        // Step 1: Extract Fenced Code Blocks (```lang ... ```)
+        let text = rawText.replace(/(```[a-zA-Z0-9#+-]*\n[\s\S]*?\n```)/g, (match) => {
+            codeBlocks.push(match);
+            return `<!--FENCED_CODE_PLACEHOLDER_${codeBlocks.length - 1}-->`;
+        });
+
+        // Step 2: Extract Inline Code Blocks (`code`)
+        text = text.replace(/(`[^`\n]+`)/g, (match) => {
+            codeBlocks.push(match);
+            return `<!--INLINE_CODE_PLACEHOLDER_${codeBlocks.length - 1}-->`;
+        });
+
+        // Step 3: Extract Block Math ($$...$$)
+        text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, mathContent) => {
+            blockMath.push(mathContent.trim());
+            return `<!--BLOCK_MATH_PLACEHOLDER_${blockMath.length - 1}-->`;
+        });
+
+        // Step 4: Extract Inline Math ($...$)
+        text = text.replace(/\$([^\$\s](?:[^\$\n]*?[^\$\s])?)\$/g, (match, mathContent) => {
+            inlineMath.push(mathContent.trim());
+            return `<!--INLINE_MATH_PLACEHOLDER_${inlineMath.length - 1}-->`;
+        });
+
+        // Step 5: Render remaining text with Marked
+        let renderedHtml = "";
+        try {
+            renderedHtml = marked.parse(text);
+        } catch (err) {
+            console.error("Markdown parse error:", err);
+            renderedHtml = `<div class="error-msg">Markdown 解析出错: ${err.message}</div>`;
+        }
+
+        // Step 6: Restore Block Math
+        renderedHtml = renderedHtml.replace(/<!--BLOCK_MATH_PLACEHOLDER_(\d+)-->/g, (match, id) => {
+            const mathContent = blockMath[parseInt(id)];
+            try {
+                return `<div class="math-block-container">${katex.renderToString(mathContent, { displayMode: true, throwOnError: false })}</div>`;
+            } catch (err) {
+                console.error("KaTeX block math error:", err);
+                return `<div class="math-error block-math-error" title="${err.message}">$$${mathContent}$$</div>`;
+            }
+        });
+
+        // Step 7: Restore Inline Math
+        renderedHtml = renderedHtml.replace(/<!--INLINE_MATH_PLACEHOLDER_(\d+)-->/g, (match, id) => {
+            const mathContent = inlineMath[parseInt(id)];
+            try {
+                return katex.renderToString(mathContent, { displayMode: false, throwOnError: false });
+            } catch (err) {
+                console.error("KaTeX inline math error:", err);
+                return `<span class="math-error" title="${err.message}">$${mathContent}$</span>`;
+            }
+        });
+
+        // Step 8: Restore Code Blocks
+        renderedHtml = renderedHtml.replace(/<!--INLINE_CODE_PLACEHOLDER_(\d+)-->/g, (match, id) => {
+            const codeContent = codeBlocks[parseInt(id)];
+            return renderInlineCode(codeContent);
+        });
+
+        renderedHtml = renderedHtml.replace(/<!--FENCED_CODE_PLACEHOLDER_(\d+)-->/g, (match, id) => {
+            const codeContent = codeBlocks[parseInt(id)];
+            return renderFencedCode(codeContent);
+        });
+
+        return renderedHtml;
+    }
+
+    function renderInlineCode(rawInline) {
+        const codeVal = rawInline.slice(1, -1);
+        const escaped = codeVal
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        return `<code>${escaped}</code>`;
+    }
+
+    function renderFencedCode(rawFenced) {
+        try {
+            return marked.parse(rawFenced);
+        } catch(err) {
+            const lines = rawFenced.split('\n');
+            const firstLine = lines[0];
+            const lang = firstLine.replace(/`/g, '').trim();
+            const codeLines = lines.slice(1, -1);
+            const codeText = codeLines.join('\n')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            return `<pre><code class="language-${lang}">${codeText}</code></pre>`;
+        }
+    }
+
+    // Live update with debouncing
+    let updateTimeout;
+    function triggerUpdate() {
+        clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(() => {
+            updatePreview();
+        }, 150);
+    }
+
+    mdTextarea.addEventListener('input', triggerUpdate);
+
+    function updatePreview() {
+        const text = mdTextarea.value;
+        const html = parseMarkdownAndMath(text);
+        renderedOutput.innerHTML = html;
+        
+        // Code syntax highlight
+        if (window.Prism) {
+            Prism.highlightAllUnder(renderedOutput);
+        }
+        
+        // TOC Outline
+        generateTOC();
+        
+        // Stats
+        updateStats(text);
+    }
+
+    // Generate Table of Contents (TOC)
+    function generateTOC() {
+        tocList.innerHTML = "";
+        const headings = renderedOutput.querySelectorAll('h1, h2, h3');
+        
+        if (headings.length === 0) {
+            docToc.classList.add('collapsed');
+            btnToggleToc.classList.remove('active');
+            return;
+        }
+
+        if (btnToggleToc.classList.contains('active')) {
+            docToc.classList.remove('collapsed');
+        }
+
+        headings.forEach((heading, index) => {
+            const id = heading.id || `heading-${index}`;
+            heading.id = id;
+            
+            const li = document.createElement('li');
+            li.className = `toc-item toc-item-${heading.tagName.toLowerCase()}`;
+            
+            const a = document.createElement('a');
+            a.href = `#${id}`;
+            a.className = 'toc-link';
+            a.innerText = heading.innerText;
+            
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                document.querySelectorAll('.toc-link').forEach(l => l.classList.remove('active'));
+                a.classList.add('active');
+            });
+            
+            li.appendChild(a);
+            tocList.appendChild(li);
+        });
+    }
+
+    // Sync TOC outline selection on scrolling
+    renderedOutput.addEventListener('scroll', () => {
+        const headings = renderedOutput.querySelectorAll('h1, h2, h3');
+        const scrollPos = renderedOutput.scrollTop + 60; // offset
+        
+        let activeHeadingId = null;
+        for (let i = 0; i < headings.length; i++) {
+            const heading = headings[i];
+            if (heading.offsetTop <= scrollPos) {
+                activeHeadingId = heading.id;
+            } else {
+                break;
+            }
+        }
+        
+        if (activeHeadingId) {
+            document.querySelectorAll('.toc-link').forEach(link => {
+                if (link.getAttribute('href') === `#${activeHeadingId}`) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        }
+    });
+
+    // Update statistics
+    function updateStats(text) {
+        if (!text.trim()) {
+            statChars.innerText = "0";
+            statWords.innerText = "0";
+            statParagraphs.innerText = "0";
+            statReadTime.innerText = "0 分钟";
+            return;
+        }
+
+        const charsCount = text.length;
+        const engWords = text.match(/\b[a-zA-Z-']+\b/g) || [];
+        const cjkChars = text.match(/[\u4e00-\u9fa5]/g) || [];
+        const wordsCount = engWords.length + cjkChars.length;
+        
+        const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+        const paragraphsCount = paragraphs.length;
+        
+        const minutes = Math.max(1, Math.ceil(wordsCount / 300));
+        
+        statChars.innerText = charsCount;
+        statWords.innerText = wordsCount;
+        statParagraphs.innerText = paragraphsCount;
+        statReadTime.innerText = `${minutes} 分钟`;
+    }
+
+    // Insert formatting at cursor
+    function insertAtCursor(beforeVal, afterVal = "") {
+        const start = mdTextarea.selectionStart;
+        const end = mdTextarea.selectionEnd;
+        const text = mdTextarea.value;
+        const selectedText = text.substring(start, end);
+        const replacement = beforeVal + selectedText + afterVal;
+        
+        mdTextarea.value = text.substring(0, start) + replacement + text.substring(end);
+        mdTextarea.focus();
+        mdTextarea.selectionStart = start + beforeVal.length;
+        mdTextarea.selectionEnd = start + beforeVal.length + selectedText.length;
+        
+        triggerUpdate();
+    }
+
+    toolbarTools.forEach(tool => {
+        tool.addEventListener('click', () => {
+            const action = tool.getAttribute('data-action');
+            switch(action) {
+                case 'bold':
+                    insertAtCursor('**', '**');
+                    break;
+                case 'italic':
+                    insertAtCursor('*', '*');
+                    break;
+                case 'link':
+                    insertAtCursor('[', '](url)');
+                    break;
+                case 'code':
+                    insertAtCursor('```javascript\n', '\n```');
+                    break;
+                case 'math':
+                    insertAtCursor('$$', '$$');
+                    break;
+                case 'table':
+                    insertAtCursor('\n| 表头1 | 表头2 |\n| --- | --- |\n| 单元格1 | 单元格2 |\n');
+                    break;
+            }
+        });
+    });
+
+    // File Drop & Load handlers
+    btnUploadMd.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            loadFile(e.target.files[0]);
+        }
+    });
+
+    function loadFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            mdTextarea.value = evt.target.result;
+            fileDisplay.innerText = file.name;
+            triggerUpdate();
+        };
+        reader.readAsText(file);
+    }
+
+    // Drag and Drop
+    mdTextarea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        mdTextarea.classList.add('dragover');
+    });
+
+    mdTextarea.addEventListener('dragleave', () => {
+        mdTextarea.classList.remove('dragover');
+    });
+
+    mdTextarea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        mdTextarea.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            loadFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    renderedOutput.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+
+    renderedOutput.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            loadFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Sample template loading
+    function loadTemplate(name) {
+        let text = "";
+        let docName = "";
+        if (name === 'math-demo') {
+            text = templates.mathDemo;
+            docName = "LaTeX 数学公式示例.md";
+        } else if (name === 'academic-demo') {
+            text = templates.academicDemo;
+            docName = "学术论文报告模板.md";
+        } else if (name === 'md-guide') {
+            text = templates.markdownGuide;
+            docName = "Markdown 快速指南.md";
+        }
+        
+        if (text) {
+            mdTextarea.value = text;
+            fileDisplay.innerText = docName;
+            triggerUpdate();
+        }
+    }
+
+    templateSelect.addEventListener('change', () => {
+        loadTemplate(templateSelect.value);
+        templateSelect.value = "";
+    });
+
+    // View Modes, Themes, Typography settings
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const mode = btn.getAttribute('data-mode');
+            workspaceContainer.className = `reader-workspace-container ${mode}-layout`;
+            
+            if (mode === 'read') {
+                renderedOutput.focus();
+            }
+        });
+    });
+
+    themeSelect.addEventListener('change', () => {
+        const theme = themeSelect.value;
+        renderedOutput.className = `rendered-markdown theme-${theme} markdown-body`;
+        applyTypography();
+    });
+
+    fontsizeSelect.addEventListener('change', () => {
+        renderedOutput.style.fontSize = fontsizeSelect.value;
+    });
+
+    fontfamilySelect.addEventListener('change', applyTypography);
+
+    lineheightSelect.addEventListener('change', () => {
+        renderedOutput.style.lineHeight = lineheightSelect.value;
+    });
+
+    function applyTypography() {
+        const fontFamily = fontfamilySelect.value;
+        renderedOutput.classList.remove('font-sans-serif', 'font-serif', 'font-monospace');
+        renderedOutput.classList.add(`font-${fontFamily}`);
+    }
+
+    btnToggleToc.addEventListener('click', () => {
+        const isCollapsed = docToc.classList.contains('collapsed');
+        if (isCollapsed) {
+            docToc.classList.remove('collapsed');
+            btnToggleToc.classList.add('active');
+        } else {
+            docToc.classList.add('collapsed');
+            btnToggleToc.classList.remove('active');
+        }
+    });
+
+    // Document search with highlights
+    let searchDebounceTimer;
+    previewSearchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(performSearchHighlight, 300);
+    });
+
+    function performSearchHighlight() {
+        const query = previewSearchInput.value.trim();
+        
+        // Re-render to clear previous search highlights
+        updatePreview();
+
+        if (!query) {
+            searchResultsCount.innerText = "";
+            return;
+        }
+
+        let matchCount = 0;
+        function highlightNode(node) {
+            if (node.nodeType === 3) {
+                const text = node.nodeValue;
+                const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+                if (regex.test(text)) {
+                    const span = document.createElement('span');
+                    span.innerHTML = text.replace(regex, `<mark class="search-highlight">$1</mark>`);
+                    node.parentNode.replaceChild(span, node);
+                    matchCount++;
+                }
+            } else if (node.nodeType === 1 && node.childNodes && 
+                       !['SCRIPT', 'STYLE', 'PRE', 'CODE'].includes(node.tagName) &&
+                       !node.classList.contains('math-block-container') && 
+                       !node.classList.contains('katex')) {
+                Array.from(node.childNodes).forEach(highlightNode);
+            }
+        }
+
+        Array.from(renderedOutput.childNodes).forEach(highlightNode);
+        searchResultsCount.innerText = matchCount > 0 ? `${matchCount} 处匹配` : "无匹配";
+        
+        const firstMatch = renderedOutput.querySelector('.search-highlight');
+        if (firstMatch) {
+            firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstMatch.classList.add('search-highlight-active');
+        }
+    }
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Export & Document actions
+    btnCopyRaw.addEventListener('click', () => {
+        navigator.clipboard.writeText(mdTextarea.value).then(() => {
+            const originalText = btnCopyRaw.innerHTML;
+            btnCopyRaw.innerHTML = "<span>已复制源码</span>";
+            setTimeout(() => btnCopyRaw.innerHTML = originalText, 1500);
+        });
+    });
+
+    btnCopyHtml.addEventListener('click', () => {
+        navigator.clipboard.writeText(renderedOutput.innerHTML).then(() => {
+            const originalText = btnCopyHtml.innerHTML;
+            btnCopyHtml.innerHTML = "<span>已复制HTML</span>";
+            setTimeout(() => btnCopyHtml.innerHTML = originalText, 1500);
+        });
+    });
+
+    btnDownloadMd.addEventListener('click', () => {
+        const text = mdTextarea.value;
+        if (!text.trim()) return;
+        const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const name = fileDisplay.innerText === '未保存文档' ? 'document.md' : fileDisplay.innerText;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    btnPrintPdf.addEventListener('click', () => {
+        window.print();
+    });
+
+    btnClearEditor.addEventListener('click', () => {
+        if (confirm('确认清空编辑器所有内容吗？此操作无法撤销。')) {
+            mdTextarea.value = '';
+            fileDisplay.innerText = '未保存文档';
+            updatePreview();
+        }
+    });
+
+    // Initialize defaults
+    renderedOutput.style.fontSize = fontsizeSelect.value;
+    renderedOutput.style.lineHeight = lineheightSelect.value;
+    applyTypography();
+
+    function supportsWasmThreads() {
+        try {
+            return (typeof SharedArrayBuffer !== 'undefined') &&
+                WebAssembly.validate(new Uint8Array([
+                    0, 97, 115, 109, 1, 0, 0, 0, 1, 4, 1, 96, 0, 0, 5, 4, 1, 3, 1, 1
+                ]));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function checkAcceleration() {
+        const badge = document.getElementById('acceleration-badge');
+        const text = document.getElementById('acceleration-text');
+        const warning = document.getElementById('engine-warning');
+        const popoverTitle = document.getElementById('accel-popover-title');
+        const popoverList = document.getElementById('accel-popover-list');
+        
+        badge.className = 'badge-status';
+        
+        const isThreadsSupported = supportsWasmThreads();
+        const isChromium = !!window.chrome || navigator.userAgent.indexOf('Chrome') > -1 || navigator.userAgent.indexOf('Edge') > -1;
+        const hasSAB = typeof SharedArrayBuffer !== 'undefined';
+        const isCOI = window.crossOriginIsolated === true;
+
+        // Helper to build a list item
+        function makeItem(icon, label, ok) {
+            return `<li><i class="pi-icon">${icon}</i> ${label}: <strong style="margin-left:auto;color:${ok ? '#10B981' : '#9CA3AF'}">${ok ? '✓' : '✗'}</strong></li>`;
+        }
+        
+        if (isThreadsSupported) {
+            badge.classList.add('status-active');
+            text.innerText = '支持';
+            popoverTitle.innerText = '硬件加速状态';
+            popoverList.innerHTML = [
+                makeItem('⚡', 'WebAssembly 多线程', true),
+                makeItem('🔒', 'SharedArrayBuffer', hasSAB),
+                makeItem('🌐', '跨域隔离 (COOP/COEP)', isCOI),
+                makeItem('🚀', '极速引擎可用', true),
+                makeItem('🖥️', isChromium ? 'Chromium 浏览器' : '当前浏览器', true),
+            ].join('');
+            console.log("[OmniToolbox] WebAssembly threads are fully supported by this browser.");
+            
+            // Enable the multi option
+            const multiOption = engineSelect.querySelector('option[value="multi"]');
+            if (multiOption) {
+                multiOption.disabled = false;
+                multiOption.innerText = '极速模式 (多线程 - 体验极速，需支持多线程环境)';
+            }
+            
+            if (isChromium) {
+                engineSelect.value = 'single';
+                warning.style.display = 'none';
+                engineSelect.addEventListener('change', () => {
+                    if (engineSelect.value === 'multi') {
+                        warning.style.display = 'block';
+                    } else {
+                        warning.style.display = 'none';
+                    }
+                });
+            } else {
+                engineSelect.value = 'multi';
+                warning.style.display = 'none';
+            }
+        } else {
+            badge.classList.add('status-inactive');
+            text.innerText = '兼容';
+            popoverTitle.innerText = '兼容模式';
+            popoverList.innerHTML = [
+                makeItem('⚡', 'WebAssembly 多线程', false),
+                makeItem('🔒', 'SharedArrayBuffer', hasSAB),
+                makeItem('🌐', '跨域隔离 (COOP/COEP)', isCOI),
+                makeItem('🚀', '极速引擎可用', false),
+                makeItem('ℹ️', '单线程兼容模式', true),
+            ].join('');
+            console.log("[OmniToolbox] WebAssembly threads NOT supported (no SharedArrayBuffer or cross-origin isolated).");
+            
+            engineSelect.value = 'single';
+            warning.style.display = 'none';
+            const multiOption = engineSelect.querySelector('option[value="multi"]');
+            if (multiOption) {
+                multiOption.disabled = true;
+                multiOption.innerText = '极速模式 (多线程 - 当前环境不可用)';
+            }
+        }
+
+        // --- Popover toggle logic ---
+        const popover = document.getElementById('accel-popover');
+        function togglePopover(e) {
+            e.stopPropagation();
+            const isOpen = popover.classList.toggle('open');
+            badge.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            popover.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        }
+        badge.addEventListener('click', togglePopover);
+        badge.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePopover(e); }
+        });
+        document.addEventListener('click', (e) => {
+            if (!badge.contains(e.target) && popover.classList.contains('open')) {
+                popover.classList.remove('open');
+                badge.setAttribute('aria-expanded', 'false');
+                popover.setAttribute('aria-hidden', 'true');
+            }
+        });
+    }
+    
+    // Reset loaded state if engine selection changes
+    engineSelect.addEventListener('change', () => {
+        isFFmpegLoaded = false;
+        ffmpeg = null;
+        appendLog('System: Compression engine selection changed. Reload will occur on next run.');
+    });
+    
+    // Run status check
+    checkAcceleration();
+    
+    // Toggle Mode UI Updates
+    function updateTogglesUI() {
+        const hasCompress = toggleCompress ? toggleCompress.checked : true;
+        const hasConvert = toggleConvert ? toggleConvert.checked : true;
+        
+        // Show/hide sections
+        if (compressionSettingsBlock) compressionSettingsBlock.style.display = hasCompress ? 'block' : 'none';
+        if (conversionSettingsBlock) conversionSettingsBlock.style.display = hasConvert ? 'block' : 'none';
+        
+        // Update action button text and status
+        const btnText = btnCompress.querySelector('.btn-text');
+        if (!hasCompress && !hasConvert) {
+            btnCompress.disabled = true;
+            if (btnText) btnText.innerText = "⚠️ 请选择处理模式";
+            btnCompress.style.opacity = '0.5';
+            btnCompress.style.pointerEvents = 'none';
+        } else {
+            btnCompress.disabled = false;
+            btnCompress.style.opacity = '1';
+            btnCompress.style.pointerEvents = 'auto';
+            if (hasCompress && hasConvert) {
+                if (btnText) btnText.innerText = "⚡ 开始本地处理 (压缩 + 转换)";
+            } else if (hasCompress) {
+                if (btnText) btnText.innerText = "📉 开始本地视频压缩";
+            } else {
+                if (btnText) btnText.innerText = "🔄 开始本地格式转换";
+            }
+        }
+    }
+
+    if (toggleCompress && toggleConvert) {
+        toggleCompress.addEventListener('change', updateTogglesUI);
+        toggleConvert.addEventListener('change', updateTogglesUI);
+        updateTogglesUI();
+    }
+
+    /* ==========================================================================
+       3. UPLOAD HANDLING & FILE METADATA EXTRACTION
+       ========================================================================== */
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Drag-over highlights
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+            handleVideoSelection(files[0]);
+        }
+    });
+
+    // Handle file selection click
+    dropZone.addEventListener('click', () => {
+        videoInput.click();
+    });
+
+    videoInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    videoInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleVideoSelection(e.target.files[0]);
+        }
+    });
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    function handleVideoSelection(file) {
+        // Validate file type
+        if (!file.type.startsWith('video/')) {
+            alert('请上传合法的视频文件！');
+            return;
+        }
+
+        selectedFile = file;
+        
+        // Show video info loading state
+        metaName.value = file.name.replace(/\.[^/.]+$/, "");
+        metaSize.innerText = formatBytes(file.size);
+        metaRes.innerText = "读取中...";
+        metaDur.innerText = "读取中...";
+        
+        // Create Object URL for loading details
+        const fileUrl = URL.createObjectURL(file);
+        srcPreview.src = fileUrl;
+        
+        // Listen for metadata loaded
+        srcPreview.onloadedmetadata = function() {
+            totalDuration = srcPreview.duration;
+            srcVideoWidth = srcPreview.videoWidth;
+            srcVideoHeight = srcPreview.videoHeight;
+            
+            // Format duration
+            const minutes = Math.floor(totalDuration / 60);
+            const seconds = Math.floor(totalDuration % 60);
+            const durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            metaRes.innerText = `${srcVideoWidth} x ${srcVideoHeight}`;
+            metaDur.innerText = `${durationStr} (${Math.round(totalDuration)} 秒)`;
+            
+            // Transition UI Panels
+            uploadPanel.style.display = 'none';
+            controlPanel.style.display = 'grid';
+        };
+
+        srcPreview.onerror = function() {
+            alert('视频流解析出错，请尝试其他格式视频。');
+            metaRes.innerText = "无法解析";
+            metaDur.innerText = "无法解析";
+        };
+    }
+
+    // Change video / cancel setup
+    btnChangeVideo.addEventListener('click', () => {
+        // Clean up preview
+        srcPreview.removeAttribute('src');
+        srcPreview.load();
+        
+        // Reset file selection
+        selectedFile = null;
+        videoInput.value = '';
+        
+        // Transition back
+        controlPanel.style.display = 'none';
+        uploadPanel.style.display = 'flex';
+    });
+
+    /* ==========================================================================
+       4. PRESETS & CONFIG PANEL BINDINGS
+       ========================================================================== */
+    
+    // Toggle active state for preset option buttons (Resolution / FPS)
+    setupPresetToggle(resPresets);
+    setupPresetToggle(fpsPresets);
+
+    function setupPresetToggle(container) {
+        const buttons = container.querySelectorAll('.preset-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                buttons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+    }
+
+    // CRF slider label updates
+    crfSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        let desc = "";
+        if (val === 17) {
+            desc = `高保真/大文件 (CRF: 17)`;
+        } else if (val >= 18 && val <= 20) {
+            desc = `高质量/清晰度极佳 (CRF: ${val})`;
+        } else if (val >= 21 && val <= 25) {
+            desc = `推荐平衡/画质与体积均衡 (CRF: ${val})`;
+        } else if (val >= 26 && val <= 28) {
+            desc = `高压缩比/体积显著减小 (CRF: ${val})`;
+        } else {
+            desc = `极致压缩/画质轻微受损 (CRF: ${val})`;
+        }
+        crfValueDisplay.innerText = desc;
+    });
+
+    /* ==========================================================================
+       5. DEV LOG TERMINAL INTERACTION
+       ========================================================================== */
+    btnToggleTerminal.addEventListener('click', () => {
+        const isCollapsed = terminalBody.classList.contains('collapsed');
+        if (isCollapsed) {
+            terminalBody.classList.remove('collapsed');
+            terminalChevron.style.transform = 'rotate(180deg)';
+        } else {
+            terminalBody.classList.add('collapsed');
+            terminalChevron.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    function appendLog(message) {
+        if (!terminalLogList) return;
+        const line = document.createElement('div');
+        line.innerText = message;
+        terminalLogList.appendChild(line);
+        
+        // Auto scroll to bottom
+        terminalLogList.scrollTop = terminalLogList.scrollHeight;
+    }
+
+    function clearLogs() {
+        if (terminalLogList) {
+            terminalLogList.innerHTML = '';
+        }
+    }
+
+    /* ==========================================================================
+       6. FFmpeg.wasm LOADING & DYNAMIC CORE PREPARATION
+       ========================================================================== */
+    async function loadFFmpeg() {
+        if (isFFmpegLoaded) return;
+        
+        progressStatusTitle.innerText = "正在加载 WebAssembly 压缩核心...";
+        progressStatusDesc.innerText = "初次运行需要下载大约 25MB 的底层算法库（缓存在本地，后续加载将在 1 秒内完成），请保持网络畅通。";
+        
+        appendLog('System: Initializing WebAssembly virtual filesystem...');
+        
+        const engineMode = engineSelect.value;
+        const isIsolated = window.crossOriginIsolated && (engineMode === 'multi');
+        let loadOptions = {};
+        
+        if (isIsolated) {
+            // Load Multi-threaded fast Core from LOCAL files to prevent Chrome blob worker freezes
+            appendLog('System: Loading self-hosted multi-threaded core-mt (Local Same-Origin)...');
+            loadOptions = {
+                coreURL: 'ffmpeg-core.js',
+                wasmURL: 'ffmpeg-core.wasm',
+                workerURL: 'ffmpeg-core.worker.js',
+            };
+        } else {
+            // Load Single-threaded compatible Core from CDN
+            appendLog('System: Loading stable single-threaded core from CDN...');
+            const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+            loadOptions = {
+                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            };
+        }
+
+        try {
+            ffmpeg = new FFmpeg();
+            
+            ffmpeg.on('log', ({ message }) => {
+                if (currentTool === 'audio') {
+                    appendAudioLog(message);
+                    parseAudioFFmpegLog(message);
+                } else {
+                    appendLog(message);
+                    parseFFmpegLog(message);
+                }
+            });
+            
+            // Core load execution
+            await ffmpeg.load(loadOptions);
+            
+            isFFmpegLoaded = true;
+            appendLog('System: FFmpeg WebAssembly core loaded successfully.');
+        } catch (error) {
+            appendLog(`System ERROR during load: ${error.message}`);
+            console.error('FFmpeg loading failed:', error);
+            throw new Error('WebAssembly 核心加载失败: ' + error.message + '\n' + (error.stack || ''));
+        }
+    }
+
+    /* ==========================================================================
+       7. LOG PROGRESS PARSING
+       ========================================================================== */
+    function parseFFmpegLog(message) {
+        // Look for: frame=  256 fps= 12 q=28.0 size=    1024kB time=00:00:10.24 bitrate=...
+        if (message.includes('frame=') && message.includes('time=')) {
+            // Parse timestamp
+            const timeMatch = message.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+            if (timeMatch && totalDuration > 0) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const seconds = parseInt(timeMatch[3]);
+                const centiseconds = parseInt(timeMatch[4]);
+                
+                const currentSeconds = (hours * 3600) + (minutes * 60) + seconds + (centiseconds / 100);
+                
+                // Calculate percentage
+                let percentage = Math.round((currentSeconds / totalDuration) * 100);
+                percentage = Math.max(0, Math.min(99, percentage)); // cap at 99 until finished
+                
+                updateProgress(percentage);
+            }
+    // Parse processing speed
+            const fpsMatch = message.match(/fps=\s*([\d\.]+)/);
+            if (fpsMatch) {
+                processingSpeedVal.innerText = `${Math.round(fpsMatch[1])} FPS`;
+            }
+        }
+    }
+
+    function updateProgress(percent) {
+        currentPercent = percent;
+        progressPctText.innerText = `${percent}%`;
+        
+        // Calculate SVG circle dash offset
+        const circumference = 439.8; // 2 * pi * 70
+        const offset = circumference - (percent / 100) * circumference;
+        progressCircle.style.strokeDashoffset = offset;
+        
+        // Calculate ETA
+        const elapsedMs = Date.now() - startTime;
+        if (percent > 2) {
+            const totalEstMs = (elapsedMs / percent) * 100;
+            const remainingMs = totalEstMs - elapsedMs;
+            
+            const remSeconds = Math.max(0, Math.round(remainingMs / 1000));
+            const m = Math.floor(remSeconds / 60);
+            const s = remSeconds % 60;
+            timeRemainingVal.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    }
+
+    function updateTimeElapsed() {
+        const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
+        const m = Math.floor(elapsedSeconds / 60);
+        const s = elapsedSeconds % 60;
+        timeElapsedVal.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    /* ==========================================================================
+       8. COMPRESSION PIPELINE RUNNER
+       ========================================================================== */
+    btnCompress.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        // Switch to progress screen
+        controlPanel.style.display = 'none';
+        progressPanel.style.display = 'block';
+        
+        // Clear previous state
+        clearLogs();
+        updateProgress(0);
+        timeElapsedVal.innerText = "00:00";
+        timeRemainingVal.innerText = "估算中...";
+        processingSpeedVal.innerText = "- FPS";
+        
+        startTime = Date.now();
+        elapsedTimer = setInterval(updateTimeElapsed, 1000);
+
+        try {
+            // 1. Prepare compiler
+            await loadFFmpeg();
+            
+            progressStatusTitle.innerText = "正在读取视频流数据...";
+            progressStatusDesc.innerText = "正在载入本地文件，此过程在浏览器内存中运行，不耗费上传流量。";
+            
+            // Generate unique names to prevent concurrent clash in FS
+            const videoFormatSelect = document.getElementById('video-format-select');
+            
+            const hasCompress = toggleCompress ? toggleCompress.checked : true;
+            const hasConvert = toggleConvert ? toggleConvert.checked : true;
+            
+            const stamp = Date.now();
+            const fileExt = selectedFile.name.split('.').pop() || 'mp4';
+            const formatVal = hasConvert ? (videoFormatSelect.value || 'mp4') : fileExt.toLowerCase();
+            const inputName = `input_${stamp}.${fileExt}`;
+            const outputName = `output_${stamp}.${formatVal}`;
+            
+            appendLog(`System: Staging local file as /${inputName} in virtual FS...`);
+            
+            // Write input file to FS
+            const fileData = await fetchFile(selectedFile);
+            await ffmpeg.writeFile(inputName, fileData);
+            
+            if (hasCompress && hasConvert) {
+                progressStatusTitle.innerText = "正在压缩与转换视频...";
+                progressStatusDesc.innerText = "正在通过 WebAssembly 核心重新编码与调整视频格式，请稍候。";
+            } else if (hasCompress) {
+                progressStatusTitle.innerText = "正在压缩视频...";
+                progressStatusDesc.innerText = "正在进行本地视频重编码压缩以优化文件体积，请稍候。";
+            } else {
+                progressStatusTitle.innerText = "正在进行格式转换...";
+                progressStatusDesc.innerText = "正在重新包装视频格式容器，此过程通常极快。";
+            }
+            
+            // 2. Assemble arguments
+            const resVal = hasCompress ? resPresets.querySelector('.preset-btn.active').getAttribute('data-val') : 'original';
+            const fpsVal = hasCompress ? fpsPresets.querySelector('.preset-btn.active').getAttribute('data-val') : 'original';
+            const crfVal = hasCompress ? crfSlider.value : 17; // Visually lossless CRF if compression is disabled
+            const audioVal = hasCompress ? audioSelect.value : (audioSelect.value === 'mute' ? 'mute' : 'copy');
+            const codecVal = codecSelect.value;
+            
+            let args = ['-i', inputName];
+            
+            // Resolution Scaling calculations & Bitrate Capping
+            let targetHeight = srcVideoHeight;
+            let targetWidth = srcVideoWidth;
+            
+            if (resVal === '1080p' && srcVideoHeight > 1080) {
+                targetHeight = 1080;
+            } else if (resVal === '720p' && srcVideoHeight > 720) {
+                targetHeight = 720;
+            } else if (resVal === '480p' && srcVideoHeight > 480) {
+                targetHeight = 480;
+            } else if (resVal === '360p' && srcVideoHeight > 360) {
+                targetHeight = 360;
+            }
+            targetWidth = Math.round((srcVideoWidth * targetHeight / srcVideoHeight) / 2) * 2;
+
+            // Determine if we should perform a lossless stream copy:
+            // 1. codecVal is 'copy'
+            // 2. OR compression is disabled, and the target container is NOT webm/gif (since they require transcoding)
+            const useCopy = (codecVal === 'copy') || (!hasCompress && formatVal !== 'webm' && formatVal !== 'gif');
+
+            if (useCopy) {
+                // Stream copy mode: fast and lossless
+                args.push('-c:v', 'copy');
+                if (audioVal === 'mute') {
+                    args.push('-an');
+                    appendLog('System: Copying video stream while muting audio stream.');
+                } else {
+                    args.push('-c:a', 'copy');
+                    appendLog('System: Copying both video and audio streams without re-encoding (Lossless & Instant).');
+                }
+                args.push(outputName);
+            } else if (formatVal === 'gif') {
+                // GIF generation uses a high quality custom filter
+                let fps = 12; // default GIF fps
+                if (fpsVal !== 'original') {
+                    fps = parseInt(fpsVal);
+                }
+                const filter = `fps=${fps},scale=${targetWidth}:${targetHeight}:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+                args.push('-vf', filter);
+                args.push(outputName);
+                appendLog(`System: GIF conversion filter set to: ${filter}`);
+            } else {
+                let maxRate = null;
+                let bufSize = null;
+                
+                if (resVal === '1080p') {
+                    maxRate = '2000k';
+                    bufSize = '4000k';
+                } else if (resVal === '720p') {
+                    maxRate = '1200k';
+                    bufSize = '2400k';
+                } else if (resVal === '480p') {
+                    maxRate = '700k';
+                    bufSize = '1400k';
+                } else if (resVal === '360p') {
+                    maxRate = '400k';
+                    bufSize = '800k';
+                } else {
+                    if (srcVideoHeight >= 1080) {
+                        maxRate = '2500k';
+                        bufSize = '5000k';
+                    } else if (srcVideoHeight >= 720) {
+                        maxRate = '1500k';
+                        bufSize = '3000k';
+                    } else {
+                        maxRate = '800k';
+                        bufSize = '1600k';
+                    }
+                }
+
+                // Configure Video Codec
+                args.push('-c:v');
+                if (formatVal === 'webm' || codecVal === 'libvpx-vp9') {
+                    args.push('libvpx-vp9');
+                    args.push('-crf', crfVal.toString());
+                    args.push('-b:v', maxRate ? maxRate : '0'); // Use cap or default
+                    args.push('-speed', '8'); // Max speed config for browser encoding
+                } else {
+                    args.push('libx264');
+                    // Adjust preset dynamically depending on thread architecture to balance wait times
+                    const isIsolated = window.crossOriginIsolated && (engineSelect.value === 'multi');
+                    args.push('-preset');
+                    args.push(isIsolated ? 'veryfast' : 'superfast');
+                    args.push('-crf');
+                    args.push(crfVal.toString());
+                    
+                    // Add VBV bitrate capping to prevent lazy preset file bloating
+                    if (maxRate && bufSize) {
+                        args.push('-maxrate');
+                        args.push(maxRate);
+                        args.push('-bufsize');
+                        args.push(bufSize);
+                    }
+                    
+                    // Chrome and Safari compatibility demands YUV 4:2:0 chroma format
+                    args.push('-pix_fmt');
+                    args.push('yuv420p');
+                }
+                
+                if (targetHeight !== srcVideoHeight) {
+                    args.push('-vf');
+                    args.push(`scale=${targetWidth}:${targetHeight}`);
+                    appendLog(`System: Scaling filter set to scale=${targetWidth}:${targetHeight}`);
+                }
+                
+                // Frame Rate Downscaling
+                if (fpsVal !== 'original') {
+                    args.push('-r');
+                    args.push(fpsVal);
+                    appendLog(`System: Framerate set to ${fpsVal} FPS`);
+                }
+                
+                // Audio Stream compression/strip logic
+                if (audioVal === 'mute') {
+                    args.push('-an');
+                    appendLog('System: Stripping audio stream completely (Mute)');
+                } else {
+                    if (audioVal === 'copy' && formatVal !== 'webm') {
+                        args.push('-c:a');
+                        args.push('copy');
+                    } else if (audioVal === 'compress') {
+                        args.push('-c:a');
+                        args.push(formatVal === 'webm' ? 'libopus' : 'aac');
+                        args.push('-b:a');
+                        args.push('64k');
+                        args.push('-ac');
+                        args.push('1'); // convert to mono stream
+                        appendLog('System: Compressing audio channel (Mono, 64kbps)');
+                    } else {
+                        args.push('-c:a');
+                        args.push(formatVal === 'webm' ? 'libopus' : 'aac');
+                        args.push('-b:a');
+                        args.push('128k');
+                    }
+                }
+                
+                args.push(outputName);
+            }
+            
+            appendLog(`System Command: ffmpeg ${args.join(' ')}`);
+            
+            // 3. RUN TRANSCODE
+            await ffmpeg.exec(args);
+            
+            // Transcoding finished successfully
+            clearInterval(elapsedTimer);
+            updateProgress(100);
+            
+            progressStatusTitle.innerText = "转码成功，正在导出文件...";
+            progressStatusDesc.innerText = "正在把数据从虚拟文件系统导出到浏览器下载缓存。";
+            
+            // 4. Retrieve result
+            appendLog(`System: Extracting compressed video /${outputName}...`);
+            const outData = await ffmpeg.readFile(outputName);
+            
+            // Create blob url
+            const mimeMap = {
+                'mp4': 'video/mp4',
+                'webm': 'video/webm',
+                'mkv': 'video/x-matroska',
+                'avi': 'video/x-msvideo',
+                'mov': 'video/quicktime',
+                'gif': 'image/gif'
+            };
+            const mimeType = mimeMap[formatVal] || 'video/mp4';
+            const compBlob = new Blob([outData.buffer], { type: mimeType });
+            outputVideoUrl = URL.createObjectURL(compBlob);
+            
+            // Populate comparison preview players
+            resOrigVideo.src = URL.createObjectURL(selectedFile);
+            
+            let resCompGif = document.getElementById('res-comp-gif');
+            if (!resCompGif) {
+                resCompGif = document.createElement('img');
+                resCompGif.id = 'res-comp-gif';
+                resCompGif.style.cssText = 'display: none; max-width: 100%; max-height: 100%; object-fit: contain;';
+                resCompVideo.parentNode.appendChild(resCompGif);
+            }
+
+            if (formatVal === 'gif') {
+                resCompVideo.style.display = 'none';
+                resCompGif.src = outputVideoUrl;
+                resCompGif.style.display = 'block';
+            } else {
+                resCompGif.style.display = 'none';
+                resCompVideo.src = outputVideoUrl;
+                resCompVideo.style.display = 'block';
+            }
+            
+            // Calculate size statistics
+            const origSize = selectedFile.size;
+            const compSize = compBlob.size;
+            const savedPct = Math.round((1 - (compSize / origSize)) * 100);
+            
+            // Render size statistics and messages dynamically
+            const resultStatusTitle = document.getElementById('result-status-title');
+            const resultStatusDesc = document.getElementById('result-status-desc');
+            const resultSavingsLabel = document.getElementById('result-savings-label');
+
+            const compPreviewTitle = document.getElementById('comp-preview-title');
+            const btnDownloadText = document.getElementById('btn-download-text');
+            const btnResetText = document.getElementById('btn-reset-text');
+
+            if (!hasCompress) {
+                if (resultStatusTitle) resultStatusTitle.innerText = "视频格式转换成功！";
+                if (resultStatusDesc) resultStatusDesc.innerText = "已为您在本地完成格式转换 (原画无损)。";
+                if (resultSavingsLabel) resultSavingsLabel.innerText = "处理模式";
+                savingPct.innerText = "原画无损";
+                savingPct.style.fontSize = "22px";
+                if (compPreviewTitle) compPreviewTitle.innerText = "✨ 转换后视频";
+                if (btnDownloadText) btnDownloadText.innerText = "下载转换后的视频";
+                if (btnResetText) btnResetText.innerText = "再转一个";
+            } else {
+                // Compression is enabled
+                if (hasConvert) {
+                    if (resultStatusTitle) resultStatusTitle.innerText = "视频压缩与转换成功！";
+                    if (resultStatusDesc) resultStatusDesc.innerText = "已为您在本地完成压缩与格式转换。";
+                    if (compPreviewTitle) compPreviewTitle.innerText = "✨ 处理后视频";
+                    if (btnDownloadText) btnDownloadText.innerText = "下载处理后的视频";
+                    if (btnResetText) btnResetText.innerText = "再处理一个";
+                } else {
+                    if (resultStatusTitle) resultStatusTitle.innerText = "视频压缩成功！";
+                    if (resultStatusDesc) resultStatusDesc.innerText = "已为您在本地完成视频压缩。";
+                    if (compPreviewTitle) compPreviewTitle.innerText = "✨ 压缩后视频";
+                    if (btnDownloadText) btnDownloadText.innerText = "下载压缩后的视频";
+                    if (btnResetText) btnResetText.innerText = "再压一个";
+                }
+                
+                if (useCopy) {
+                    if (resultSavingsLabel) resultSavingsLabel.innerText = "转换画质";
+                    savingPct.innerText = "原画无损";
+                    savingPct.style.fontSize = "22px";
+                } else if (savedPct > 0) {
+                    if (resultSavingsLabel) resultSavingsLabel.innerText = "节省率";
+                    savingPct.innerText = `${savedPct}%`;
+                    savingPct.style.fontSize = "28px";
+                } else {
+                    if (resultSavingsLabel) resultSavingsLabel.innerText = "文件大小变化";
+                    savingPct.innerText = savedPct === 0 ? "无变化" : `+${Math.abs(savedPct)}%`;
+                    savingPct.style.fontSize = "24px";
+                }
+            }
+
+            savingDetail.innerText = `${formatBytes(origSize)} -> ${formatBytes(compSize)}`;
+            
+            // Render resolution details
+            origResBadge.innerText = `${srcVideoWidth}x${srcVideoHeight}`;
+            
+            let compWidth = srcVideoWidth;
+            let compHeight = srcVideoHeight;
+            if (targetHeight !== srcVideoHeight) {
+                compHeight = targetHeight;
+                compWidth = Math.round((srcVideoWidth * targetHeight / srcVideoHeight) / 2) * 2;
+            }
+            compResBadge.innerText = `${compWidth}x${compHeight} (${formatVal.toUpperCase()})`;
+            
+            // Setup download button hook
+            const originalName = selectedFile.name;
+            const originalClean = originalName.replace(/\.[^/.]+$/, "");
+            let exportName = metaName.value.trim();
+            if (!exportName) {
+                exportName = originalClean;
+            }
+            const exportClean = exportName.replace(/\.[^/.]+$/, "");
+            const isManuallyChanged = (exportClean !== originalClean);
+
+            let finalDownloadName = "";
+            if (isManuallyChanged) {
+                finalDownloadName = `${exportClean}.${formatVal}`;
+            } else {
+                let downloadPrefix = '[processed]';
+                if (hasCompress && !hasConvert) {
+                    downloadPrefix = '[compressed]';
+                } else if (!hasCompress && hasConvert) {
+                    downloadPrefix = '[converted]';
+                }
+                finalDownloadName = `${downloadPrefix}_${originalClean}.${formatVal}`;
+            }
+
+            btnDownload.onclick = () => {
+                const a = document.createElement('a');
+                a.href = outputVideoUrl;
+                a.download = finalDownloadName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            // 5. Clean up WASM FS to prevent browser out-of-memory leaks
+            appendLog('System: Cleaning up virtual filesystem assets...');
+            await ffmpeg.deleteFile(inputName);
+            await ffmpeg.deleteFile(outputName);
+            
+            // Transition to result UI panel
+            progressPanel.style.display = 'none';
+            resultPanel.style.display = 'flex';
+            
+        } catch (error) {
+            clearInterval(elapsedTimer);
+            progressPanel.style.display = 'none';
+            controlPanel.style.display = 'grid';
+            
+            console.error('Compression pipeline failed:', error);
+            alert(`压缩失败:\n${error.message}`);
+        }
+    });
+
+    /* ==========================================================================
+       9. RESET PIPELINE FOR ANOTHER VIDEO
+       ========================================================================== */
+    btnReset.addEventListener('click', () => {
+        // Cleanup generated blob URLs to avoid memory leaks
+        if (outputVideoUrl) {
+            URL.revokeObjectURL(outputVideoUrl);
+            outputVideoUrl = null;
+        }
+        
+        // Reset player sources
+        resOrigVideo.removeAttribute('src');
+        resOrigVideo.load();
+        resCompVideo.removeAttribute('src');
+        resCompVideo.load();
+        srcPreview.removeAttribute('src');
+        srcPreview.load();
+        
+        const resCompGif = document.getElementById('res-comp-gif');
+        if (resCompGif) {
+            resCompGif.removeAttribute('src');
+            resCompGif.style.display = 'none';
+        }
+        
+        // Reset state
+        selectedFile = null;
+        videoInput.value = '';
+        
+        // Transition back
+        resultPanel.style.display = 'none';
+        uploadPanel.style.display = 'flex';
+    });
+
+    /* ==========================================================================
+       10. 视频格式切换与编码器选项联动 (H.264, WebM, GIF, Stream Copy 联动)
+       ========================================================================== */
+    const videoFormatSelect = document.getElementById('video-format-select');
+    if (videoFormatSelect) {
+        videoFormatSelect.addEventListener('change', () => {
+            const val = videoFormatSelect.value;
+            const codecCol = codecSelect.closest('.config-col');
+            const audioRow = document.getElementById('video-audio-row');
+            const crfGroup = crfSlider.closest('.config-group');
+            const copyOption = document.getElementById('codec-option-copy');
+            
+            // WebM and GIF do not support standard H.264 stream copying in ordinary use
+            if (val === 'webm' || val === 'gif') {
+                if (copyOption) { copyOption.disabled = true; copyOption.style.display = 'none'; }
+                if (codecSelect.value === 'copy') {
+                    codecSelect.value = val === 'webm' ? 'libvpx-vp9' : 'libx264';
+                }
+            } else {
+                if (copyOption) { copyOption.disabled = false; copyOption.style.display = 'block'; }
+            }
+            
+            // GIF specific adjustments
+            if (val === 'gif') {
+                if (codecCol) { codecCol.style.opacity = '0.3'; codecSelect.disabled = true; }
+                if (audioRow) { audioRow.style.opacity = '0.3'; audioRow.querySelector('select').disabled = true; }
+                if (crfGroup) { crfGroup.style.opacity = '0.3'; crfSlider.disabled = true; }
+            } else {
+                if (codecSelect.value !== 'copy') {
+                    if (codecCol) { codecCol.style.opacity = '1'; codecSelect.disabled = false; }
+                    if (audioRow) { audioRow.style.opacity = '1'; audioRow.querySelector('select').disabled = false; }
+                    if (crfGroup) { crfGroup.style.opacity = '1'; crfSlider.disabled = false; }
+                }
+                
+                if (codecSelect.value !== 'copy') {
+                    if (val === 'webm') {
+                        codecSelect.value = 'libvpx-vp9';
+                    } else {
+                        codecSelect.value = 'libx264';
+                    }
+                }
+            }
+            // Trigger codec select change callback manually to update UI disabling
+            codecSelect.dispatchEvent(new Event('change'));
+        });
+    }
+
+    // Codec select change handler: block parameters when copy is selected
+    if (codecSelect) {
+        codecSelect.addEventListener('change', () => {
+            const isCopy = codecSelect.value === 'copy';
+            const resPresetsContainer = document.getElementById('resolution-presets');
+            const fpsPresetsContainer = document.getElementById('fps-presets');
+            const crfSliderEl = document.getElementById('crf-slider');
+            const audioSelectEl = document.getElementById('audio-select');
+            const engineSelectEl = document.getElementById('engine-select');
+
+            [resPresetsContainer, fpsPresetsContainer, crfSliderEl, audioSelectEl, engineSelectEl].forEach(el => {
+                if (el) {
+                    el.style.opacity = isCopy ? '0.3' : '1';
+                    if (el.tagName === 'SELECT' || el.tagName === 'INPUT') {
+                        el.disabled = isCopy;
+                    } else {
+                        el.querySelectorAll('button').forEach(btn => btn.disabled = isCopy);
+                    }
+                }
+            });
+        });
+    }
+
+    // Set current active tool for log routing
+    let currentTool = 'video';
+    const originalNavItems = document.querySelectorAll('.nav-menu .nav-item');
+    originalNavItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const target = item.getAttribute('data-target');
+            if (target === 'audio-converter') {
+                currentTool = 'audio';
+            } else if (target === 'video-compressor') {
+                currentTool = 'video';
+            }
+        });
+    });
+
+    /* ==========================================================================
+       11. 图片压缩与格式转换逻辑 (Canvas 驱动 - 100% 本地)
+       ========================================================================== */
+    const imageInput = document.getElementById('image-input');
+    const imageDropZone = document.getElementById('image-drop-zone');
+    const imageUploadPanel = document.getElementById('image-upload-panel');
+    const imageControlPanel = document.getElementById('image-control-panel');
+    const imageProgressPanel = document.getElementById('image-progress-panel');
+    const imageResultPanel = document.getElementById('image-result-panel');
+    
+    const imageSrcPreview = document.getElementById('image-src-preview');
+    const imageMetaName = document.getElementById('image-meta-name');
+    const imageMetaSize = document.getElementById('image-meta-size');
+    const imageMetaRes = document.getElementById('image-meta-resolution');
+    const imageQueueContainer = document.getElementById('image-queue-container');
+    
+    const imageFormatSelect = document.getElementById('image-format-select');
+    const imageQualitySlider = document.getElementById('image-quality-slider');
+    const imageQualityDisplay = document.getElementById('image-quality-display');
+    const imageResizePresets = document.getElementById('image-resize-presets');
+    const imageCustomResizeGroup = document.getElementById('image-custom-resize-group');
+    const imageCustomWidth = document.getElementById('image-custom-width');
+    const imageCustomHeight = document.getElementById('image-custom-height');
+    
+    const btnConvertImage = document.getElementById('btn-convert-image');
+    const btnChangeImage = document.getElementById('btn-change-image');
+    const imageBtnDownload = document.getElementById('image-btn-download');
+    const imageBtnReset = document.getElementById('image-btn-reset');
+    
+    const imageSingleResultGrid = document.getElementById('image-single-result-grid');
+    const imageBatchResultPanel = document.getElementById('image-batch-result-panel');
+    const imageBatchResultsList = document.getElementById('image-batch-results-list');
+    const imageSavingPct = document.getElementById('image-saving-pct');
+    const imageSavingDetail = document.getElementById('image-saving-detail');
+    const imageOrigBadge = document.getElementById('image-orig-badge');
+    const imageCompBadge = document.getElementById('image-comp-badge');
+    const imageResOrig = document.getElementById('image-res-orig');
+    const imageResComp = document.getElementById('image-res-comp');
+
+    let selectedImageFiles = [];
+    let imagePreviewWidth = 0;
+    let imagePreviewHeight = 0;
+    let imagePreviewRatio = 1;
+    let convertedImages = []; // Array of { blob, name, origSize, size, width, height }
+
+    // Drop & Selection listeners
+    imageDropZone.addEventListener('dragover', (e) => { e.preventDefault(); imageDropZone.classList.add('dragover'); });
+    imageDropZone.addEventListener('dragleave', () => imageDropZone.classList.remove('dragover'));
+    imageDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        imageDropZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleImageFilesSelection(e.dataTransfer.files);
+        }
+    });
+    imageDropZone.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    imageInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleImageFilesSelection(e.target.files);
+        }
+    });
+
+    function handleImageFilesSelection(filesList) {
+        selectedImageFiles = Array.from(filesList).filter(f => f.type.startsWith('image/'));
+        if (selectedImageFiles.length === 0) {
+            alert('请选择有效的图片文件！');
+            return;
+        }
+        
+        // Populate preview for first file
+        const firstFile = selectedImageFiles[0];
+        if (selectedImageFiles.length > 1) {
+            imageMetaName.value = firstFile.name.replace(/\.[^/.]+$/, "") + ` 等 ${selectedImageFiles.length} 张图片`;
+            imageMetaName.disabled = true;
+            imageMetaName.style.borderBottom = 'none';
+            imageMetaName.style.pointerEvents = 'none';
+        } else {
+            imageMetaName.value = firstFile.name.replace(/\.[^/.]+$/, "");
+            imageMetaName.disabled = false;
+            imageMetaName.style.borderBottom = '';
+            imageMetaName.style.pointerEvents = '';
+        }
+        imageMetaSize.innerText = formatBytes(firstFile.size);
+        
+        // Show Image Preview
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const img = new Image();
+            img.onload = function() {
+                imagePreviewWidth = img.width;
+                imagePreviewHeight = img.height;
+                imagePreviewRatio = img.width / img.height;
+                imageMetaRes.innerText = `${img.width} x ${img.height}`;
+                
+                if (selectedImageFiles.length > 1) {
+                    // Render queue
+                    imageQueueContainer.innerHTML = '';
+                    selectedImageFiles.forEach((file, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'image-queue-item';
+                        item.innerHTML = `
+                            <span class="image-queue-name">${index + 1}. ${file.name}</span>
+                            <span class="image-queue-size">${formatBytes(file.size)}</span>
+                            <button class="image-queue-remove" data-idx="${index}">×</button>
+                        `;
+                        imageQueueContainer.appendChild(item);
+                    });
+                    
+                    // Hook removes
+                    imageQueueContainer.querySelectorAll('.image-queue-remove').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const idx = parseInt(btn.getAttribute('data-idx'));
+                            selectedImageFiles.splice(idx, 1);
+                            if (selectedImageFiles.length === 0) {
+                                btnChangeImage.click();
+                            } else {
+                                handleImageFilesSelection(selectedImageFiles);
+                            }
+                        });
+                    });
+                    
+                    imageQueueContainer.style.display = 'block';
+                } else {
+                    imageQueueContainer.style.display = 'none';
+                }
+                
+                imageSrcPreview.src = evt.target.result;
+                imageUploadPanel.style.display = 'none';
+                imageControlPanel.style.display = 'grid';
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(firstFile);
+    }
+
+    btnChangeImage.addEventListener('click', () => {
+        selectedImageFiles = [];
+        imageInput.value = '';
+        imageSrcPreview.removeAttribute('src');
+        imageControlPanel.style.display = 'none';
+        imageUploadPanel.style.display = 'flex';
+    });
+
+    // Format hide slider trigger
+    imageFormatSelect.addEventListener('change', () => {
+        const val = imageFormatSelect.value;
+        const qGroup = document.getElementById('image-quality-group');
+        if (val === 'image/png' || val === 'image/bmp') {
+            qGroup.style.opacity = '0.3';
+            imageQualitySlider.disabled = true;
+            imageQualityDisplay.innerText = '无损格式';
+        } else {
+            qGroup.style.opacity = '1';
+            imageQualitySlider.disabled = false;
+            updateImageQualityDisplay(imageQualitySlider.value);
+        }
+    });
+
+    imageQualitySlider.addEventListener('input', (e) => {
+        updateImageQualityDisplay(e.target.value);
+    });
+
+    function updateImageQualityDisplay(val) {
+        let desc = "平衡";
+        if (val >= 90) desc = "高保真";
+        else if (val <= 30) desc = "极限压缩";
+        imageQualityDisplay.innerText = `${desc} (${val}%)`;
+    }
+
+    // Resize preset handler
+    setupPresetToggle(document.getElementById('image-resize-presets'));
+    const imgResizeBtns = document.querySelectorAll('#image-resize-presets .preset-btn');
+    imgResizeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = btn.getAttribute('data-val');
+            if (val === 'custom') {
+                imageCustomResizeGroup.style.display = 'block';
+                imageCustomWidth.value = imagePreviewWidth;
+                imageCustomHeight.value = imagePreviewHeight;
+            } else {
+                imageCustomResizeGroup.style.display = 'none';
+            }
+        });
+    });
+
+    imageCustomWidth.addEventListener('input', () => {
+        const w = parseInt(imageCustomWidth.value);
+        if (w > 0) {
+            imageCustomHeight.value = Math.round(w / imagePreviewRatio);
+        }
+    });
+
+    // RUN IMAGE CONVERSION
+    btnConvertImage.addEventListener('click', async () => {
+        if (selectedImageFiles.length === 0) return;
+        
+        imageControlPanel.style.display = 'none';
+        imageProgressPanel.style.display = 'block';
+        
+        convertedImages = [];
+        const formatMime = imageFormatSelect.value;
+        const formatExt = formatMime.split('/')[1] === 'jpeg' ? 'jpg' : formatMime.split('/')[1];
+        const quality = parseInt(imageQualitySlider.value) / 100;
+
+        const originalName = selectedImageFiles[0].name;
+        const originalClean = originalName.replace(/\.[^/.]+$/, "");
+        let exportName = imageMetaName.value.trim();
+        if (!exportName) {
+            exportName = originalClean;
+        }
+        const exportClean = exportName.replace(/\.[^/.]+$/, "");
+        const isManuallyChanged = (exportClean !== originalClean) && (selectedImageFiles.length === 1);
+        
+        const resizeBtn = document.querySelector('#image-resize-presets .preset-btn.active');
+        const resizeMode = resizeBtn.getAttribute('data-val');
+        
+        let totalOrigSize = 0;
+        let totalCompSize = 0;
+
+        for (let i = 0; i < selectedImageFiles.length; i++) {
+            const file = selectedImageFiles[i];
+            totalOrigSize += file.size;
+            
+            // Draw to canvas
+            const imgDataUrl = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+
+            const img = await new Promise((resolve) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.src = imgDataUrl;
+            });
+
+            // Calc target dimensions
+            let targetW = img.width;
+            let targetH = img.height;
+            if (resizeMode === 'custom') {
+                const customW = parseInt(imageCustomWidth.value);
+                if (customW > 0) {
+                    targetW = customW;
+                    targetH = Math.round(customW / (img.width / img.height));
+                }
+            } else if (resizeMode !== 'original') {
+                const scale = parseFloat(resizeMode);
+                targetW = Math.round(img.width * scale);
+                targetH = Math.round(img.height * scale);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+            
+            const convertedBlob = await new Promise((resolve) => {
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, formatMime, quality);
+            });
+            
+            totalCompSize += convertedBlob.size;
+            
+            let cleanName = file.name.replace(/\.[^/.]+$/, "");
+            if (isManuallyChanged) {
+                cleanName = exportClean;
+            }
+            convertedImages.push({
+                blob: convertedBlob,
+                name: `${cleanName}.${formatExt}`,
+                origSize: file.size,
+                size: convertedBlob.size,
+                width: targetW,
+                height: targetH
+            });
+        }
+
+        // Processing finished, display results
+        imageProgressPanel.style.display = 'none';
+        
+        // Populate layout
+        const pctSaved = Math.round((1 - (totalCompSize / totalOrigSize)) * 100);
+        imageSavingPct.innerText = `${pctSaved}%`;
+        imageSavingDetail.innerText = `${formatBytes(totalOrigSize)} -> ${formatBytes(totalCompSize)}`;
+
+        if (convertedImages.length === 1) {
+            // Single image preview
+            const resultItem = convertedImages[0];
+            const resultUrl = URL.createObjectURL(resultItem.blob);
+            
+            imageResOrig.src = imageSrcPreview.src;
+            imageResComp.src = resultUrl;
+            
+            imageOrigBadge.innerText = `${imagePreviewWidth}x${imagePreviewHeight} (${selectedImageFiles[0].type.split('/')[1].toUpperCase()})`;
+            imageCompBadge.innerText = `${resultItem.width}x${resultItem.height} (${formatExt.toUpperCase()})`;
+            
+            imageSingleResultGrid.style.display = 'grid';
+            imageBatchResultPanel.style.display = 'none';
+            
+            // Single Download Hook
+            imageBtnDownload.onclick = () => {
+                const a = document.createElement('a');
+                a.href = resultUrl;
+                a.download = resultItem.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+        } else {
+            // Batch previews
+            imageSingleResultGrid.style.display = 'none';
+            imageBatchResultsList.innerHTML = '';
+            
+            convertedImages.forEach((item, index) => {
+                const resultUrl = URL.createObjectURL(item.blob);
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'image-result-item';
+                itemDiv.innerHTML = `
+                    <div class="image-result-info">
+                        <span class="image-result-name">${item.name}</span>
+                        <span class="image-result-stats">尺寸: ${item.width}x${item.height} | 大小: ${formatBytes(item.size)} (节省 ${Math.round((1 - (item.size/item.origSize)) * 100)}%)</span>
+                    </div>
+                    <div class="image-result-actions">
+                        <a href="${resultUrl}" download="${item.name}" class="btn btn-secondary btn-xs">下载</a>
+                    </div>
+                `;
+                imageBatchResultsList.appendChild(itemDiv);
+            });
+            
+            imageBatchResultPanel.style.display = 'block';
+            
+            // Download All Sequentially Hook
+            imageBtnDownload.onclick = () => {
+                convertedImages.forEach((item, index) => {
+                    setTimeout(() => {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(item.blob);
+                        a.download = item.name;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }, index * 200); // interval to prevent browser thread blocking
+                });
+            };
+        }
+        
+        imageResultPanel.style.display = 'flex';
+    });
+
+    imageBtnReset.addEventListener('click', () => {
+        // Cleanup URLs
+        convertedImages.forEach(img => {
+            if (img.url) URL.revokeObjectURL(img.url);
+        });
+        imageResOrig.removeAttribute('src');
+        imageResComp.removeAttribute('src');
+        imageResultPanel.style.display = 'none';
+        imageUploadPanel.style.display = 'flex';
+        selectedImageFiles = [];
+        imageInput.value = '';
+    });
+
+    /* ==========================================================================
+       12. 音频格式转换逻辑 (FFmpeg.wasm 驱动 - 100% 本地)
+       ========================================================================== */
+    const audioInput = document.getElementById('audio-input');
+    const audioDropZone = document.getElementById('audio-drop-zone');
+    const audioUploadPanel = document.getElementById('audio-upload-panel');
+    const audioControlPanel = document.getElementById('audio-control-panel');
+    const audioProgressPanel = document.getElementById('audio-progress-panel');
+    const audioResultPanel = document.getElementById('audio-result-panel');
+    
+    const audioSrcPreview = document.getElementById('audio-src-preview');
+    const audioMetaName = document.getElementById('audio-meta-name');
+    const audioMetaSize = document.getElementById('audio-meta-size');
+    const audioMetaDur = document.getElementById('audio-meta-duration');
+    
+    const audioFormatSelect = document.getElementById('audio-format-select');
+    const audioBitrateSelect = document.getElementById('audio-bitrate-select');
+    const audioSamplerateSelect = document.getElementById('audio-samplerate-select');
+    const audioChannelsSelect = document.getElementById('audio-channels-select');
+    
+    const btnConvertAudio = document.getElementById('btn-convert-audio');
+    const btnChangeAudio = document.getElementById('btn-change-audio');
+    const audioBtnDownload = document.getElementById('audio-btn-download');
+    const audioBtnReset = document.getElementById('audio-btn-reset');
+    
+    const audioProgressCircle = document.getElementById('audio-progress-indicator-circle');
+    const audioProgressPctText = document.getElementById('audio-progress-percentage-text');
+    const audioProgressStatusTitle = document.getElementById('audio-progress-status-title');
+    const audioProgressStatusDesc = document.getElementById('audio-progress-status-desc');
+    const audioTimeElapsedVal = document.getElementById('audio-time-elapsed');
+    const audioTimeRemainingVal = document.getElementById('audio-time-remaining');
+    
+    const audioBtnToggleTerminal = document.getElementById('audio-btn-toggle-terminal');
+    const audioTerminalBody = document.getElementById('audio-terminal-body');
+    const audioTerminalChevron = document.getElementById('audio-terminal-chevron');
+    const audioTerminalLogList = document.getElementById('audio-terminal-log-list');
+    
+    const audioSavingPct = document.getElementById('audio-saving-pct');
+    const audioSavingDetail = document.getElementById('audio-saving-detail');
+    const audioResComp = document.getElementById('audio-res-comp');
+
+    let selectedAudioFile = null;
+    let audioTotalDuration = 0;
+    let audioStartTime = 0;
+    let audioElapsedTimer = null;
+    let audioOutputUrl = null;
+
+    audioDropZone.addEventListener('dragover', (e) => { e.preventDefault(); audioDropZone.classList.add('dragover'); });
+    audioDropZone.addEventListener('dragleave', () => audioDropZone.classList.remove('dragover'));
+    audioDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        audioDropZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleAudioFileSelection(e.dataTransfer.files[0]);
+        }
+    });
+    audioDropZone.addEventListener('click', () => audioInput.click());
+    audioInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    audioInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleAudioFileSelection(e.target.files[0]);
+        }
+    });
+
+    function handleAudioFileSelection(file) {
+        if (!file.type.startsWith('audio/') && !file.name.endsWith('.flac') && !file.name.endsWith('.ogg') && !file.name.endsWith('.wav')) {
+            alert('请上传有效的音频文件！');
+            return;
+        }
+        
+        selectedAudioFile = file;
+        audioMetaName.value = file.name.replace(/\.[^/.]+$/, "");
+        audioMetaSize.innerText = formatBytes(file.size);
+        audioMetaDur.innerText = "读取中...";
+        
+        const audioUrl = URL.createObjectURL(file);
+        audioSrcPreview.src = audioUrl;
+        
+        audioSrcPreview.onloadedmetadata = function() {
+            audioTotalDuration = audioSrcPreview.duration;
+            const minutes = Math.floor(audioTotalDuration / 60);
+            const seconds = Math.floor(audioTotalDuration % 60);
+            audioMetaDur.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} (${Math.round(audioTotalDuration)} 秒)`;
+            
+            audioUploadPanel.style.display = 'none';
+            audioControlPanel.style.display = 'grid';
+        };
+
+        audioSrcPreview.onerror = function() {
+            alert('音频格式加载错误，但您依然可以尝试转码。');
+            audioMetaDur.innerText = "未知时长";
+            audioTotalDuration = 0;
+            audioUploadPanel.style.display = 'none';
+            audioControlPanel.style.display = 'grid';
+        };
+    }
+
+    btnChangeAudio.addEventListener('click', () => {
+        selectedAudioFile = null;
+        audioInput.value = '';
+        audioSrcPreview.removeAttribute('src');
+        audioSrcPreview.load();
+        audioControlPanel.style.display = 'none';
+        audioUploadPanel.style.display = 'flex';
+    });
+
+    // Toggle terminal logs
+    audioBtnToggleTerminal.addEventListener('click', () => {
+        const isCollapsed = audioTerminalBody.classList.contains('collapsed');
+        if (isCollapsed) {
+            audioTerminalBody.classList.remove('collapsed');
+            audioTerminalChevron.style.transform = 'rotate(180deg)';
+        } else {
+            audioTerminalBody.classList.add('collapsed');
+            audioTerminalChevron.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    function updateAudioProgress(percent) {
+        audioProgressPctText.innerText = `${percent}%`;
+        const circumference = 439.8;
+        const offset = circumference - (percent / 100) * circumference;
+        audioProgressCircle.style.strokeDashoffset = offset;
+        
+        const elapsedMs = Date.now() - audioStartTime;
+        if (percent > 2) {
+            const totalEstMs = (elapsedMs / percent) * 100;
+            const remainingMs = totalEstMs - elapsedMs;
+            const remSeconds = Math.max(0, Math.round(remainingMs / 1000));
+            const m = Math.floor(remSeconds / 60);
+            const s = remSeconds % 60;
+            audioTimeRemainingVal.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    }
+
+    function updateAudioTimeElapsed() {
+        const elapsedSeconds = Math.round((Date.now() - audioStartTime) / 1000);
+        const m = Math.floor(elapsedSeconds / 60);
+        const s = elapsedSeconds % 60;
+        audioTimeElapsedVal.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Hide bitrate selector if WAV is selected
+    audioFormatSelect.addEventListener('change', () => {
+        const val = audioFormatSelect.value;
+        const bGroup = document.getElementById('audio-bitrate-group');
+        if (val === 'wav' || val === 'flac') {
+            bGroup.style.opacity = '0.3';
+            audioBitrateSelect.disabled = true;
+        } else {
+            bGroup.style.opacity = '1';
+            audioBitrateSelect.disabled = false;
+        }
+    });
+
+    // RUN AUDIO CONVERSION
+    btnConvertAudio.addEventListener('click', async () => {
+        if (!selectedAudioFile) return;
+
+        audioControlPanel.style.display = 'none';
+        audioProgressPanel.style.display = 'block';
+        
+        audioTerminalLogList.innerHTML = '';
+        updateAudioProgress(0);
+        audioTimeElapsedVal.innerText = "00:00";
+        audioTimeRemainingVal.innerText = "估算中...";
+        
+        audioStartTime = Date.now();
+        audioElapsedTimer = setInterval(updateAudioTimeElapsed, 1000);
+
+        try {
+            // Load core
+            await loadFFmpeg();
+            
+            audioProgressStatusTitle.innerText = "正在读取音频流数据...";
+            audioProgressStatusDesc.innerText = "正在把文件加载到内存虚拟系统。";
+            
+            const stamp = Date.now();
+            const formatVal = audioFormatSelect.value;
+            const fileExt = selectedAudioFile.name.split('.').pop() || 'mp3';
+            const inputName = `audio_in_${stamp}.${fileExt}`;
+            const outputName = `audio_out_${stamp}.${formatVal}`;
+            
+            appendAudioLog(`System: Staging audio file as /${inputName} in virtual FS...`);
+            
+            const fileData = await fetchFile(selectedAudioFile);
+            await ffmpeg.writeFile(inputName, fileData);
+            
+            audioProgressStatusTitle.innerText = "正在转码音频格式...";
+            audioProgressStatusDesc.innerText = "进行高保真本地重采样与压缩声道。";
+            
+            // Build arguments
+            const bitrate = audioBitrateSelect.value;
+            const sampleRate = audioSamplerateSelect.value;
+            const channels = audioChannelsSelect.value;
+            
+            let args = ['-i', inputName];
+            
+            // Configure encoder
+            args.push('-c:a');
+            if (formatVal === 'mp3') {
+                args.push('libmp3lame');
+                args.push('-b:a', bitrate);
+            } else if (formatVal === 'wav') {
+                args.push('pcm_s16le'); // uncompressed 16-bit PCM WAV
+            } else if (formatVal === 'm4a') {
+                args.push('aac');
+                args.push('-b:a', bitrate);
+            } else if (formatVal === 'ogg') {
+                args.push('libvorbis');
+                args.push('-b:a', bitrate);
+            } else if (formatVal === 'flac') {
+                args.push('flac');
+            }
+            
+            if (sampleRate !== 'copy') {
+                args.push('-ar', sampleRate);
+            }
+            if (channels !== 'copy') {
+                args.push('-ac', channels);
+            }
+            
+            args.push(outputName);
+            appendAudioLog(`System Command: ffmpeg ${args.join(' ')}`);
+            
+            await ffmpeg.exec(args);
+            
+            clearInterval(audioElapsedTimer);
+            updateAudioProgress(100);
+            
+            audioProgressStatusTitle.innerText = "音频转码成功，正在导出...";
+            audioProgressStatusDesc.innerText = "正在生成最终的本地音频链接。";
+            
+            const outData = await ffmpeg.readFile(outputName);
+            const mimeMap = {
+                'mp3': 'audio/mpeg',
+                'wav': 'audio/wav',
+                'm4a': 'audio/mp4',
+                'ogg': 'audio/ogg',
+                'flac': 'audio/flac'
+            };
+            const mimeType = mimeMap[formatVal] || 'audio/mpeg';
+            const compBlob = new Blob([outData.buffer], { type: mimeType });
+            audioOutputUrl = URL.createObjectURL(compBlob);
+            
+            audioResComp.src = audioOutputUrl;
+            
+            // Populate details
+            audioSavingPct.innerText = formatBytes(compBlob.size);
+            audioSavingDetail.innerText = `${formatBytes(selectedAudioFile.size)} -> ${formatBytes(compBlob.size)}`;
+            
+            const originalName = selectedAudioFile.name;
+            const originalClean = originalName.replace(/\.[^/.]+$/, "");
+            let exportName = audioMetaName.value.trim();
+            if (!exportName) {
+                exportName = originalClean;
+            }
+            const exportClean = exportName.replace(/\.[^/.]+$/, "");
+            const isManuallyChanged = (exportClean !== originalClean);
+
+            let finalDownloadName = "";
+            if (isManuallyChanged) {
+                finalDownloadName = `${exportClean}.${formatVal}`;
+            } else {
+                finalDownloadName = `[converted]_${originalClean}.${formatVal}`;
+            }
+
+            audioBtnDownload.onclick = () => {
+                const a = document.createElement('a');
+                a.href = audioOutputUrl;
+                a.download = finalDownloadName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            // Clean up virtual FS
+            appendAudioLog('System: Cleaning up virtual files...');
+            await ffmpeg.deleteFile(inputName);
+            await ffmpeg.deleteFile(outputName);
+            
+            audioProgressPanel.style.display = 'none';
+            audioResultPanel.style.display = 'flex';
+            
+        } catch (err) {
+            clearInterval(audioElapsedTimer);
+            audioProgressPanel.style.display = 'none';
+            audioControlPanel.style.display = 'grid';
+            console.error('Audio pipeline failed:', err);
+            alert(`音频转换失败: ${err.message}`);
+        }
+    });
+
+    audioBtnReset.addEventListener('click', () => {
+        if (audioOutputUrl) {
+            URL.revokeObjectURL(audioOutputUrl);
+            audioOutputUrl = null;
+        }
+        audioResComp.removeAttribute('src');
+        audioResComp.load();
+        audioSrcPreview.removeAttribute('src');
+        audioSrcPreview.load();
+        
+        selectedAudioFile = null;
+        audioInput.value = '';
+        audioResultPanel.style.display = 'none';
+        audioUploadPanel.style.display = 'flex';
+    });
+
+    function appendAudioLog(message) {
+        if (!audioTerminalLogList) return;
+        const line = document.createElement('div');
+        line.innerText = message;
+        audioTerminalLogList.appendChild(line);
+        audioTerminalLogList.scrollTop = audioTerminalLogList.scrollHeight;
+    }
+
+        /* ==========================================================================
+       13. PDF 工作台业务逻辑 (100% 浏览器本地处理 - Acrobat-style Unified Workspace)
+       ========================================================================== */
+    // Global PDF workspace state
+    let currentPdfFile = null;
+    let currentPdfBytes = null;
+    let originalPdfBytes = null; // Backup of the clean original uploaded PDF
+    let currentPdfPageCount = 0;
+    let uploadedImages = []; // Array of { file, dataUrl, name, size }
+    let mergePdfQueue = [];  // Array of { file, name, size }
+    let renderedImagesList = []; // Array of { blob, dataUrl, pageNum, name }
+    let pdfOutputBlobUrl = null;
+
+    // Helper: Reset results blob URL
+    function pdfCleanupOutputUrl() {
+        if (pdfOutputBlobUrl) {
+            URL.revokeObjectURL(pdfOutputBlobUrl);
+            pdfOutputBlobUrl = null;
+        }
+    }
+
+    // PDF.js Worker loader with COEP bypass
+    let isPdfJsInitialized = false;
+    async function initPdfJs() {
+        if (isPdfJsInitialized) return;
+        try {
+            const workerUrl = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+            const resp = await fetch(workerUrl);
+            if (!resp.ok) throw new Error('Failed to fetch worker script');
+            const workerCode = await resp.text();
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+            isPdfJsInitialized = true;
+            console.log('[PDF.js] Worker registered locally using Blob.');
+        } catch (e) {
+            console.error('[PDF.js] Local worker load failed, falling back to CDN URL:', e);
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        }
+    }
+
+    // Shared progress function
+    function updatePdfProgress(percent, title, desc, step, count) {
+        const progressCircle = document.getElementById('pdf-progress-indicator-circle');
+        const progressPctText = document.getElementById('pdf-progress-percentage-text');
+        const progressTitle = document.getElementById('pdf-progress-status-title');
+        const progressDesc = document.getElementById('pdf-progress-status-desc');
+        const stepDisplay = document.getElementById('pdf-progress-step-display');
+        const countDisplay = document.getElementById('pdf-progress-count-display');
+        
+        if (progressPctText) progressPctText.innerText = `${percent}%`;
+        if (progressTitle && title) progressTitle.innerText = title;
+        if (progressDesc && desc) progressDesc.innerText = desc;
+        if (stepDisplay && step) stepDisplay.innerText = step;
+        if (countDisplay && count) countDisplay.innerText = count;
+        
+        if (progressCircle) {
+            const circumference = 439.8;
+            const offset = circumference - (percent / 100) * circumference;
+            progressCircle.style.strokeDashoffset = offset;
+        }
+    }
+
+    // Elements
+    const pdfMainFileInput = document.getElementById('pdf-main-file-input');
+    const pdfMainDropZone = document.getElementById('pdf-main-drop-zone');
+    const pdfWorkspacePanel = document.getElementById('pdf-workspace-panel');
+    const pdfMainUploadPanel = document.getElementById('pdf-main-upload-panel');
+
+    // Setup drag and drop for initial upload
+    setupPdfDragDrop(pdfMainDropZone, pdfMainFileInput, (files) => {
+        if (files && files.length > 0) {
+            handlePdfMainFilesSelection(files);
+        }
+    });
+
+    // File selection handler (PDF vs Images)
+    async function handlePdfMainFilesSelection(files) {
+        if (files.length === 0) return;
+        
+        const firstFile = files[0];
+        const isPdf = firstFile.name.toLowerCase().endsWith('.pdf');
+        
+        // Show progress panel
+        pdfMainUploadPanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(10, '正在读取选定文件...', '准备加载工作台...', '0 / 1', '1 个文件');
+        
+        try {
+            if (isPdf) {
+                // PDF Mode
+                currentPdfFile = firstFile;
+                uploadedImages = [];
+                
+                currentPdfBytes = await firstFile.arrayBuffer();
+                originalPdfBytes = currentPdfBytes.slice(0); // Backup original clean bytes
+                
+                // Get page count via PDF-Lib
+                const pdfDoc = await PDFLib.PDFDocument.load(currentPdfBytes.slice(0), { ignoreEncryption: true });
+                currentPdfPageCount = pdfDoc.getPageCount();
+                
+                // Set metadata text
+                document.getElementById('pdf-ws-meta-name').value = currentPdfFile.name.replace(/\.[^/.]+$/, "");
+                document.getElementById('pdf-ws-meta-name').title = currentPdfFile.name;
+                document.getElementById('pdf-ws-meta-size').innerText = formatBytes(currentPdfFile.size);
+                document.getElementById('pdf-ws-meta-pages').innerText = `${currentPdfPageCount} 页`;
+                document.getElementById('pdf-ws-meta-pages-row').style.display = 'flex';
+                
+                // Set merge list
+                mergePdfQueue = [{
+                    file: currentPdfFile,
+                    name: currentPdfFile.name,
+                    size: currentPdfFile.size
+                }];
+                renderPdfWsMergeQueue();
+                
+                // Configure sidebar & view panels
+                document.getElementById('pdf-actions-sidebar-group').style.display = 'flex';
+                document.getElementById('pdf-images-sidebar-group').style.display = 'none';
+                
+                document.getElementById('pdf-viewer-grid').style.display = 'grid';
+                document.getElementById('pdf-images-grid-view').style.display = 'none';
+                document.getElementById('pdf-images-grid-view').classList.remove('grid-active');
+                
+                await renderPdfThumbnails();
+            } else {
+                // Image Mode
+                uploadedImages = [];
+                currentPdfFile = null;
+                currentPdfBytes = null;
+                currentPdfPageCount = 0;
+                
+                const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.bmp'];
+                const imageFiles = Array.from(files).filter(f => 
+                    f.type.startsWith('image/') || allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
+                );
+                
+                if (imageFiles.length === 0) {
+                    alert('请上传 PDF 文件或有效的图片文件！');
+                    resetPdfWs();
+                    return;
+                }
+                
+                // Read images to data URLs
+                for (let i = 0; i < imageFiles.length; i++) {
+                    const imgFile = imageFiles[i];
+                    const item = {
+                        file: imgFile,
+                        name: imgFile.name,
+                        size: imgFile.size,
+                        dataUrl: ''
+                    };
+                    uploadedImages.push(item);
+                    
+                    await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            item.dataUrl = e.target.result;
+                            resolve();
+                        };
+                        reader.readAsDataURL(imgFile);
+                    });
+                }
+                
+                // Update metadata
+                updateImageWsMetadata();
+                
+                // Configure sidebar & views
+                document.getElementById('pdf-actions-sidebar-group').style.display = 'none';
+                document.getElementById('pdf-images-sidebar-group').style.display = 'flex';
+                
+                document.getElementById('pdf-viewer-grid').style.display = 'none';
+                document.getElementById('pdf-images-grid-view').style.display = 'grid';
+                document.getElementById('pdf-images-grid-view').classList.add('grid-active');
+                
+                renderImageThumbnails();
+            }
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+        } catch (err) {
+            console.error('Failed to load file into PDF workspace:', err);
+            alert(`加载文件失败: ${err.message}`);
+            resetPdfWs();
+        }
+    }
+
+    // Helper: Rotate a 2D canvas 90 degrees clockwise visually
+    function rotateCanvas90Degrees(canvas) {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        // Create an offscreen buffer canvas to hold current pixels
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(canvas, 0, 0);
+        
+        // Swap dimensions of target canvas
+        const oldW = canvas.width;
+        const oldH = canvas.height;
+        canvas.width = oldH;
+        canvas.height = oldW;
+        
+        // Clear, rotate, and redraw rotated pixels
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((90 * Math.PI) / 180);
+        ctx.drawImage(tempCanvas, -oldW / 2, -oldH / 2);
+    }
+
+    // Helper: Re-index visual attributes of PDF thumbnails after mutations
+    function reindexPdfThumbnails() {
+        const cards = document.querySelectorAll('#pdf-viewer-grid .pdf-thumbnail-card');
+        const totalCount = cards.length;
+        currentPdfPageCount = totalCount;
+        
+        cards.forEach((card, idx) => {
+            const pageNum = idx + 1;
+            const pageIdx = idx;
+            
+            card.setAttribute('data-page-num', pageNum);
+            
+            const badge = card.querySelector('.pdf-thumbnail-page-badge');
+            if (badge) badge.innerText = pageNum;
+            
+            const delBtn = card.querySelector('.pdf-thumbnail-delete-btn');
+            if (delBtn) delBtn.setAttribute('data-page-idx', pageIdx);
+            
+            const rotateBtn = card.querySelector('.btn-rotate-page');
+            if (rotateBtn) rotateBtn.setAttribute('data-page-idx', pageIdx);
+            
+            const moveLeftBtn = card.querySelector('.btn-move-page-left');
+            if (moveLeftBtn) {
+                moveLeftBtn.setAttribute('data-page-idx', pageIdx);
+                if (pageNum === 1) {
+                    moveLeftBtn.disabled = true;
+                    moveLeftBtn.style.opacity = '0.3';
+                    moveLeftBtn.style.cursor = 'not-allowed';
+                } else {
+                    moveLeftBtn.disabled = false;
+                    moveLeftBtn.style.opacity = '1';
+                    moveLeftBtn.style.cursor = 'pointer';
+                }
+            }
+            
+            const moveRightBtn = card.querySelector('.btn-move-page-right');
+            if (moveRightBtn) {
+                moveRightBtn.setAttribute('data-page-idx', pageIdx);
+                if (pageNum === totalCount) {
+                    moveRightBtn.disabled = true;
+                    moveRightBtn.style.opacity = '0.3';
+                    moveRightBtn.style.cursor = 'not-allowed';
+                } else {
+                    moveRightBtn.disabled = false;
+                    moveRightBtn.style.opacity = '1';
+                    moveRightBtn.style.cursor = 'pointer';
+                }
+            }
+        });
+        
+        // Sync metadata pages display
+        const metaPages = document.getElementById('pdf-ws-meta-pages');
+        if (metaPages) {
+            metaPages.innerText = `${totalCount} 页`;
+        }
+    }
+
+    // Helper: Compile all mutations (deletions, reordering, rotations) into a fresh PDF
+    async function compileModifiedPdf() {
+        if (!originalPdfBytes) {
+            return currentPdfBytes;
+        }
+        
+        const cards = document.querySelectorAll('#pdf-viewer-grid .pdf-thumbnail-card');
+        if (cards.length === 0) {
+            return currentPdfBytes;
+        }
+        
+        const pdfDoc = await PDFLib.PDFDocument.load(originalPdfBytes.slice(0));
+        const newDoc = await PDFLib.PDFDocument.create();
+        
+        const indices = [];
+        const rotations = [];
+        
+        cards.forEach(card => {
+            const origIdx = parseInt(card.getAttribute('data-original-index'));
+            const rot = parseInt(card.getAttribute('data-rotation') || '0');
+            indices.push(origIdx);
+            rotations.push(rot);
+        });
+        
+        const copiedPages = await newDoc.copyPages(pdfDoc, indices);
+        copiedPages.forEach((page, idx) => {
+            const rot = rotations[idx] % 360;
+            if (rot !== 0) {
+                const origRot = page.getRotation().angle;
+                page.setRotation(PDFLib.degrees((origRot + rot) % 360));
+            }
+            newDoc.addPage(page);
+        });
+        
+        return await newDoc.save();
+    }
+
+    // Helper: Get compiled PDF bytes and sync to currentPdfBytes
+    async function getActivePdfBytes() {
+        const compiled = await compileModifiedPdf();
+        currentPdfBytes = compiled;
+        return compiled;
+    }
+
+    // Helper: Get final export PDF file name, applying prefix if not manually changed by user
+    function getExportPdfName(prefix = '') {
+        const originalName = currentPdfFile.name;
+        let exportName = document.getElementById('pdf-ws-meta-name').value.trim();
+        if (!exportName) {
+            exportName = originalName;
+        }
+        if (!exportName.toLowerCase().endsWith('.pdf')) {
+            exportName += '.pdf';
+        }
+        
+        const isManuallyChanged = (exportName !== originalName);
+        if (isManuallyChanged) {
+            return exportName;
+        } else {
+            return prefix ? `${prefix}_${originalName}` : originalName;
+        }
+    }
+
+    // Render PDF Canvas thumbnails
+    async function renderPdfThumbnails() {
+        const grid = document.getElementById('pdf-viewer-grid');
+        grid.innerHTML = '';
+        
+        updatePdfProgress(20, '正在初始化渲染核心...', '使用 HTML5 Canvas 绘制高保真缩略图...', '0 / ' + currentPdfPageCount, currentPdfPageCount + ' 页');
+        
+        try {
+            await initPdfJs();
+            const loadingTask = pdfjsLib.getDocument({ data: currentPdfBytes.slice(0) });
+            const pdf = await loadingTask.promise;
+            
+            for (let pageNum = 1; pageNum <= currentPdfPageCount; pageNum++) {
+                const pct = Math.round(20 + (pageNum / currentPdfPageCount) * 80);
+                updatePdfProgress(pct, `正在生成第 ${pageNum} 页 / 共 ${currentPdfPageCount} 页缩略图...`, '本地离线 Canvas 像素转换...', `${pageNum} / ${currentPdfPageCount}`, currentPdfPageCount + ' 页');
+                
+                const page = await pdf.getPage(pageNum);
+                const scale = 0.4; // Render at low resolution for visual speed
+                const viewport = page.getViewport({ scale: scale });
+                
+                const card = document.createElement('div');
+                card.className = 'pdf-thumbnail-card';
+                card.setAttribute('data-page-num', pageNum);
+                card.setAttribute('data-original-index', pageNum - 1);
+                card.setAttribute('data-rotation', '0');
+                card.innerHTML = `
+                    <span class="pdf-thumbnail-page-badge">${pageNum}</span>
+                    <button class="pdf-thumbnail-delete-btn" data-page-idx="${pageNum - 1}" title="删除此页">×</button>
+                    <canvas class="pdf-thumbnail-canvas"></canvas>
+                    <div class="pdf-thumbnail-select-indicator">✓</div>
+                    <div class="pdf-thumbnail-actions">
+                        <button class="pdf-thumbnail-action-btn btn-rotate-page" data-page-idx="${pageNum - 1}" title="顺时针旋转90°">↻</button>
+                        <button class="pdf-thumbnail-action-btn btn-move-page-left" data-page-idx="${pageNum - 1}" title="前移" ${pageNum === 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>◀</button>
+                        <button class="pdf-thumbnail-action-btn btn-move-page-right" data-page-idx="${pageNum - 1}" title="后移" ${pageNum === currentPdfPageCount ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>▶</button>
+                    </div>
+                    <span class="pdf-thumbnail-card-name" title="${currentPdfFile.name}">${currentPdfFile.name}</span>
+                `;
+                
+                const canvas = card.querySelector('.pdf-thumbnail-canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                // Bind delete page click
+                const delBtn = card.querySelector('.pdf-thumbnail-delete-btn');
+                delBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(delBtn.getAttribute('data-page-idx'));
+                    deletePdfPage(idx);
+                });
+
+                // Bind rotate page click
+                const rotateBtn = card.querySelector('.btn-rotate-page');
+                rotateBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(rotateBtn.getAttribute('data-page-idx'));
+                    rotatePdfPage(idx, 90);
+                });
+
+                // Bind move left click
+                const moveLeftBtn = card.querySelector('.btn-move-page-left');
+                moveLeftBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(moveLeftBtn.getAttribute('data-page-idx'));
+                    if (idx > 0) {
+                        reorderPdfPage(idx, idx - 1);
+                    }
+                });
+
+                // Bind move right click
+                const moveRightBtn = card.querySelector('.btn-move-page-right');
+                moveRightBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(moveRightBtn.getAttribute('data-page-idx'));
+                    if (idx < currentPdfPageCount - 1) {
+                        reorderPdfPage(idx, idx + 1);
+                    }
+                });
+
+                // Toggle select on card click
+                card.addEventListener('click', () => {
+                    card.classList.toggle('selected');
+                    updateDeleteRangeFromSelected();
+                });
+
+                grid.appendChild(card);
+            }
+            
+            // Sync selection state if input range is already populated
+            const deleteRangeInput = document.getElementById('pdf-ws-delete-range');
+            if (deleteRangeInput && deleteRangeInput.value.trim()) {
+                syncSelectionFromRangeInput();
+            }
+        } catch (e) {
+            console.error('Thumbnail generation failed:', e);
+            grid.innerHTML = `<div style="grid-column: 1/-1; padding: 20px; text-align: center; color: #F87171;">缩略图加载失败: ${e.message}</div>`;
+        }
+    }
+
+    // Delete a specific page visually
+    function deletePdfPage(pageIdx) {
+        if (!confirm(`确定要从 PDF 中删除第 ${pageIdx + 1} 页吗？`)) {
+            return;
+        }
+        
+        const card = document.querySelector(`#pdf-viewer-grid .pdf-thumbnail-card[data-page-num="${pageIdx + 1}"]`);
+        if (card) {
+            card.remove();
+        }
+        
+        reindexPdfThumbnails();
+        
+        if (currentPdfPageCount === 0) {
+            alert('所有页面都已删除！');
+            resetPdfWs();
+            return;
+        }
+        
+        // Clear input range
+        const deleteRangeInput = document.getElementById('pdf-ws-delete-range');
+        if (deleteRangeInput) {
+            deleteRangeInput.value = '';
+            document.getElementById('pdf-ws-delete-selected-text').innerText = '提示：支持在右侧直接点击缩略图勾选，或在此处输入页码。';
+        }
+    }
+
+    // Rotate a specific page visually
+    function rotatePdfPage(pageIdx, degreesVal) {
+        const card = document.querySelector(`#pdf-viewer-grid .pdf-thumbnail-card[data-page-num="${pageIdx + 1}"]`);
+        if (card) {
+            const canvas = card.querySelector('.pdf-thumbnail-canvas');
+            if (canvas) {
+                rotateCanvas90Degrees(canvas);
+            }
+            // Update rotation attribute
+            const currentRotation = parseInt(card.getAttribute('data-rotation') || '0');
+            const newRotation = (currentRotation + degreesVal) % 360;
+            card.setAttribute('data-rotation', newRotation);
+        }
+    }
+
+    // Rearrange a page from fromIdx to toIdx visually
+    function reorderPdfPage(fromIdx, toIdx) {
+        const grid = document.getElementById('pdf-viewer-grid');
+        const cards = Array.from(grid.querySelectorAll('.pdf-thumbnail-card'));
+        const cardToMove = cards[fromIdx];
+        if (cardToMove && cards[toIdx]) {
+            if (toIdx > fromIdx) {
+                grid.insertBefore(cardToMove, cards[toIdx].nextSibling);
+            } else {
+                grid.insertBefore(cardToMove, cards[toIdx]);
+            }
+        }
+        
+        reindexPdfThumbnails();
+    }
+
+
+    // Helper: update delete range text based on selected cards
+    function updateDeleteRangeFromSelected() {
+        const selectedCards = document.querySelectorAll('#pdf-viewer-grid .pdf-thumbnail-card.selected');
+        const pageNums = Array.from(selectedCards).map(card => parseInt(card.getAttribute('data-page-num'))).sort((a,b)=>a-b);
+        
+        const rangeInput = document.getElementById('pdf-ws-delete-range');
+        const descText = document.getElementById('pdf-ws-delete-selected-text');
+        
+        if (pageNums.length > 0) {
+            rangeInput.value = formatPageNumbers(pageNums);
+            descText.innerText = `已选中第 ${formatPageNumbers(pageNums)} 页，共 ${pageNums.length} 页。`;
+        } else {
+            rangeInput.value = '';
+            descText.innerText = '提示：支持在右侧直接点击缩略图勾选，或在此处输入页码。';
+        }
+    }
+
+    // Helper: format list of page numbers into ranges (e.g. [1,2,3,5] -> "1-3, 5")
+    function formatPageNumbers(pages) {
+        if (pages.length === 0) return '';
+        const ranges = [];
+        let start = pages[0];
+        let end = pages[0];
+        
+        for (let i = 1; i < pages.length; i++) {
+            if (pages[i] === end + 1) {
+                end = pages[i];
+            } else {
+                if (start === end) {
+                    ranges.push(`${start}`);
+                } else {
+                    ranges.push(`${start}-${end}`);
+                }
+                start = pages[i];
+                end = pages[i];
+            }
+        }
+        if (start === end) {
+            ranges.push(`${start}`);
+        } else {
+            ranges.push(`${start}-${end}`);
+        }
+        return ranges.join(', ');
+    }
+
+    // Helper: Highlight card selections matching manually entered range
+    function syncSelectionFromRangeInput() {
+        const deleteRangeInput = document.getElementById('pdf-ws-delete-range');
+        if (!deleteRangeInput) return;
+        const val = deleteRangeInput.value.trim();
+        const cards = document.querySelectorAll('#pdf-viewer-grid .pdf-thumbnail-card');
+        
+        cards.forEach(card => card.classList.remove('selected'));
+        if (!val) return;
+        
+        try {
+            const pagesToSelect = parseRanges(val, currentPdfPageCount);
+            pagesToSelect.forEach(idx => {
+                const card = document.querySelector(`#pdf-viewer-grid .pdf-thumbnail-card[data-page-num="${idx + 1}"]`);
+                if (card) {
+                    card.classList.add('selected');
+                }
+            });
+        } catch (e) {
+            // ignore parse errors while typing
+        }
+    }
+
+    // Encrypt PDF with password and restrictions using standard PDF Security Handler (Revision 3, 128-bit RC4)
+    async function encryptPdf() {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        
+        try {
+            await getActivePdfBytes();
+        } catch (e) {
+            console.error('编译 PDF 失败:', e);
+            alert(`编译 PDF 失败: ${e.message}`);
+            return;
+        }
+        
+        const passwordInput = document.getElementById('pdf-ws-encrypt-pw');
+        const password = passwordInput.value;
+        if (!password) {
+            alert('请输入要设置的打开密码！');
+            passwordInput.focus();
+            return;
+        }
+        
+        const restrictCopy = document.getElementById('pdf-ws-encrypt-restrict-copy').checked;
+        const restrictPrint = document.getElementById('pdf-ws-encrypt-restrict-print').checked;
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(20, '正在加密 PDF 文档...', '正在应用安全许可配置...', '0 / 1', currentPdfFile.name);
+        
+        try {
+            pdfCleanupOutputUrl();
+            const pdfDoc = await PDFLib.PDFDocument.load(currentPdfBytes.slice(0), { ignoreEncryption: true });
+            
+            // --- PDF Encryption Implementation (PDF Standard Revision 3) ---
+            const { PDFName, PDFHexString, PDFString, PDFDict, PDFArray, PDFRawStream, PDFNumber } = PDFLib;
+
+            const PADDING = new Uint8Array([
+                0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41,
+                0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
+                0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80,
+                0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A
+            ]);
+
+            function md5(data) {
+                const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+                const S = [
+                    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+                    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+                    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+                    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+                ];
+                const K = new Uint32Array([
+                    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
+                    0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+                    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+                    0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+                    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
+                    0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+                    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
+                    0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+                    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+                    0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+                    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
+                    0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+                    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
+                    0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+                    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+                    0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+                ]);
+                let a0 = 0x67452301;
+                let b0 = 0xefcdab89;
+                let c0 = 0x98badcfe;
+                let d0 = 0x10325476;
+                const msgLen = bytes.length;
+                const msgBitLen = msgLen * 8;
+                const msgLenPadded = ((msgLen + 9 + 63) & ~63);
+                const msg = new Uint8Array(msgLenPadded);
+                msg.set(bytes);
+                msg[msgLen] = 0x80;
+                const dataView = new DataView(msg.buffer);
+                dataView.setUint32(msgLenPadded - 8, msgBitLen, true);
+                dataView.setUint32(msgLenPadded - 4, 0, true);
+                for (let offset = 0; offset < msgLenPadded; offset += 64) {
+                    const chunk = new Uint32Array(msg.buffer, offset, 16);
+                    let a = a0, b = b0, c = c0, d = d0;
+                    for (let i = 0; i < 64; i++) {
+                        let f, g;
+                        if (i < 16) {
+                            f = (b & c) | ((~b) & d);
+                            g = i;
+                        } else if (i < 32) {
+                            f = (d & b) | ((~d) & c);
+                            g = (5 * i + 1) % 16;
+                        } else if (i < 48) {
+                            f = b ^ c ^ d;
+                            g = (3 * i + 5) % 16;
+                        } else {
+                            f = c ^ (b | (~d));
+                            g = (7 * i) % 16;
+                        }
+                        f = (f + a + K[i] + chunk[g]) >>> 0;
+                        a = d;
+                        d = c;
+                        c = b;
+                        b = (b + ((f << S[i]) | (f >>> (32 - S[i])))) >>> 0;
+                    }
+                    a0 = (a0 + a) >>> 0;
+                    b0 = (b0 + b) >>> 0;
+                    c0 = (c0 + c) >>> 0;
+                    d0 = (d0 + d) >>> 0;
+                }
+                const result = new Uint8Array(16);
+                const view = new DataView(result.buffer);
+                view.setUint32(0, a0, true);
+                view.setUint32(4, b0, true);
+                view.setUint32(8, c0, true);
+                view.setUint32(12, d0, true);
+                return result;
+            }
+
+            class RC4 {
+                constructor(key) {
+                    this.s = new Uint8Array(256);
+                    this.i = 0;
+                    this.j = 0;
+                    for (let i = 0; i < 256; i++) {
+                        this.s[i] = i;
+                    }
+                    let j = 0;
+                    for (let i = 0; i < 256; i++) {
+                        j = (j + this.s[i] + key[i % key.length]) & 0xFF;
+                        [this.s[i], this.s[j]] = [this.s[j], this.s[i]];
+                    }
+                }
+                process(data) {
+                    const result = new Uint8Array(data.length);
+                    for (let k = 0; k < data.length; k++) {
+                        this.i = (this.i + 1) & 0xFF;
+                        this.j = (this.j + this.s[this.i]) & 0xFF;
+                        [this.s[this.i], this.s[this.j]] = [this.s[this.j], this.s[this.i]];
+                        const t = (this.s[this.i] + this.s[this.j]) & 0xFF;
+                        result[k] = data[k] ^ this.s[t];
+                    }
+                    return result;
+                }
+            }
+
+            function hexToBytes(hex) {
+                const bytes = new Uint8Array(hex.length / 2);
+                for (let i = 0; i < bytes.length; i++) {
+                    bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+                }
+                return bytes;
+            }
+
+            function bytesToHex(bytes) {
+                return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+
+            function padPassword(password) {
+                const pwdBytes = new TextEncoder().encode(password);
+                const padded = new Uint8Array(32);
+                if (pwdBytes.length >= 32) {
+                    padded.set(pwdBytes.slice(0, 32));
+                } else {
+                    padded.set(pwdBytes);
+                    padded.set(PADDING.slice(0, 32 - pwdBytes.length), pwdBytes.length);
+                }
+                return padded;
+            }
+
+            function computeEncryptionKey(userPassword, ownerKey, permissions, fileId) {
+                const paddedPwd = padPassword(userPassword);
+                const hashInput = new Uint8Array(paddedPwd.length + ownerKey.length + 4 + fileId.length);
+                let offset = 0;
+                hashInput.set(paddedPwd, offset);
+                offset += paddedPwd.length;
+                hashInput.set(ownerKey, offset);
+                offset += ownerKey.length;
+                hashInput[offset++] = permissions & 0xFF;
+                hashInput[offset++] = (permissions >> 8) & 0xFF;
+                hashInput[offset++] = (permissions >> 16) & 0xFF;
+                hashInput[offset++] = (permissions >> 24) & 0xFF;
+                hashInput.set(fileId, offset);
+                let hash = md5(hashInput);
+                for (let i = 0; i < 50; i++) {
+                    hash = md5(hash.slice(0, 16));
+                }
+                return hash.slice(0, 16);
+            }
+
+            function computeOwnerKey(ownerPassword, userPassword) {
+                const paddedOwner = padPassword(ownerPassword || userPassword);
+                let hash = md5(paddedOwner);
+                for (let i = 0; i < 50; i++) {
+                    hash = md5(hash);
+                }
+                const paddedUser = padPassword(userPassword);
+                let result = new Uint8Array(paddedUser);
+                for (let i = 0; i < 20; i++) {
+                    const key = new Uint8Array(hash.length);
+                    for (let j = 0; j < hash.length; j++) {
+                        key[j] = hash[j] ^ i;
+                    }
+                    const rc4 = new RC4(key.slice(0, 16));
+                    result = rc4.process(result);
+                }
+                return result;
+            }
+
+            function computeUserKey(encryptionKey, fileId) {
+                const hashInput = new Uint8Array(PADDING.length + fileId.length);
+                hashInput.set(PADDING);
+                hashInput.set(fileId, PADDING.length);
+                const hash = md5(hashInput);
+                const rc4 = new RC4(encryptionKey);
+                let result = rc4.process(hash);
+                for (let i = 1; i <= 19; i++) {
+                    const key = new Uint8Array(encryptionKey.length);
+                    for (let j = 0; j < encryptionKey.length; j++) {
+                        key[j] = encryptionKey[j] ^ i;
+                    }
+                    const rc4iter = new RC4(key);
+                    result = rc4iter.process(result);
+                }
+                const finalResult = new Uint8Array(32);
+                finalResult.set(result);
+                finalResult.set(new Uint8Array(16), 16);
+                return finalResult;
+            }
+
+            function encryptObject(data, objectNum, generationNum, encryptionKey) {
+                const keyInput = new Uint8Array(encryptionKey.length + 5);
+                keyInput.set(encryptionKey);
+                keyInput[encryptionKey.length] = objectNum & 0xFF;
+                keyInput[encryptionKey.length + 1] = (objectNum >> 8) & 0xFF;
+                keyInput[encryptionKey.length + 2] = (objectNum >> 16) & 0xFF;
+                keyInput[encryptionKey.length + 3] = generationNum & 0xFF;
+                keyInput[encryptionKey.length + 4] = (generationNum >> 8) & 0xFF;
+                const objectKey = md5(keyInput);
+                const rc4 = new RC4(objectKey.slice(0, Math.min(encryptionKey.length + 5, 16)));
+                return rc4.process(data);
+            }
+
+            function encryptStringsInObject(obj, objectNum, generationNum, encryptionKey) {
+                if (!obj) return;
+                if (obj instanceof PDFString) {
+                    const originalBytes = obj.asBytes();
+                    const encrypted = encryptObject(originalBytes, objectNum, generationNum, encryptionKey);
+                    obj.value = Array.from(encrypted).map(b => String.fromCharCode(b)).join('');
+                } else if (obj instanceof PDFHexString) {
+                    const originalBytes = obj.asBytes();
+                    const encrypted = encryptObject(originalBytes, objectNum, generationNum, encryptionKey);
+                    obj.value = bytesToHex(encrypted);
+                } else if (obj instanceof PDFDict) {
+                    const entries = obj.entries();
+                    for (const [key, value] of entries) {
+                        const keyName = key.asString();
+                        if (keyName !== '/Length' && keyName !== '/Filter' && keyName !== '/DecodeParms') {
+                            encryptStringsInObject(value, objectNum, generationNum, encryptionKey);
+                        }
+                    }
+                } else if (obj instanceof PDFArray) {
+                    const array = obj.asArray();
+                    for (const element of array) {
+                        encryptStringsInObject(element, objectNum, generationNum, encryptionKey);
+                    }
+                }
+            }
+
+            const ownerPassword = 'owner_' + Math.random().toString(36).substring(2);
+
+            let permissions = 0xFFFFFFFC; // Default allows everything
+            if (restrictCopy) {
+                permissions &= ~(1 << 4); // Clear copying permission (bit 5)
+            }
+            if (restrictPrint) {
+                permissions &= ~(1 << 2); // Clear printing permission (bit 3)
+                permissions &= ~(1 << 11); // Clear high-res printing permission (bit 12)
+            }
+
+            const context = pdfDoc.context;
+            
+            // Get file ID
+            let fileId;
+            const trailer = context.trailerInfo;
+            const idArray = trailer.ID;
+            
+            if (idArray && Array.isArray(idArray) && idArray.length > 0) {
+                const idString = idArray[0].toString();
+                const hexStr = idString.replace(/^<|>$/g, '');
+                fileId = hexToBytes(hexStr);
+            } else {
+                const randomBytes = new Uint8Array(16);
+                if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                    crypto.getRandomValues(randomBytes);
+                } else {
+                    for (let i = 0; i < 16; i++) {
+                        randomBytes[i] = Math.floor(Math.random() * 256);
+                    }
+                }
+                fileId = randomBytes;
+                const idHex1 = PDFHexString.of(bytesToHex(fileId));
+                const idHex2 = PDFHexString.of(bytesToHex(fileId));
+                trailer.ID = [idHex1, idHex2];
+            }
+            
+            const ownerKey = computeOwnerKey(ownerPassword, password);
+            const encryptionKey = computeEncryptionKey(password, ownerKey, permissions, fileId);
+            const userKey = computeUserKey(encryptionKey, fileId);
+            
+            // Encrypt all objects
+            const indirectObjects = context.enumerateIndirectObjects();
+            
+            for (const [ref, obj] of indirectObjects) {
+                const objectNum = ref.objectNumber;
+                const generationNum = ref.generationNumber || 0;
+
+                // Skip the encryption dictionary itself
+                if (obj instanceof PDFDict) {
+                    const filter = obj.get(PDFName.of('Filter'));
+                    if (filter && filter.asString() === '/Standard') {
+                        continue;
+                    }
+                }
+
+                // Skip objects that must not be encrypted per PDF spec (Section 7.6.1)
+                if (obj instanceof PDFRawStream && obj.dict) {
+                    const type = obj.dict.get(PDFName.of('Type'));
+                    if (type) {
+                        const typeName = type.toString();
+                        if (typeName === '/XRef' || typeName === '/Sig') {
+                            continue;
+                        }
+                    }
+                }
+
+                // Encrypt streams
+                if (obj instanceof PDFRawStream) {
+                    const streamData = obj.contents;
+                    const encrypted = encryptObject(streamData, objectNum, generationNum, encryptionKey);
+                    obj.contents = encrypted;
+
+                    if (obj.dict) {
+                        encryptStringsInObject(obj.dict, objectNum, generationNum, encryptionKey);
+                    }
+                }
+
+                // Encrypt strings in non-stream objects
+                if (!(obj instanceof PDFRawStream)) {
+                    encryptStringsInObject(obj, objectNum, generationNum, encryptionKey);
+                }
+            }
+            
+            // Create the /Encrypt dictionary
+            const encryptDict = context.obj({
+                Filter: PDFName.of('Standard'),
+                V: PDFNumber.of(2),        // Version 2 (RC4)
+                R: PDFNumber.of(3),        // Revision 3 (128-bit)
+                Length: PDFNumber.of(128),  // Key length in bits
+                P: PDFNumber.of(permissions),
+                O: PDFHexString.of(bytesToHex(ownerKey)),
+                U: PDFHexString.of(bytesToHex(userKey))
+            });
+            
+            const encryptRef = context.register(encryptDict);
+            trailer.Encrypt = encryptRef;
+            
+            updatePdfProgress(80, '正在生成加密后的 PDF 字节流...', '本地安全序列处理...', '保存中', currentPdfFile.name);
+            
+            const encryptedBytes = await pdfDoc.save({
+                useObjectStreams: false
+            });
+            const blob = new Blob([encryptedBytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = 'PDF 安全加密成功！';
+            document.getElementById('pdf-result-desc').innerText = `已成功在您的本地为 PDF 文档设置密码保护。打开此文件需要输入您指定的密码。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            const finalName = getExportPdfName('[encrypted]');
+            document.getElementById('pdf-result-detail').innerText = `生成文件：${finalName}`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = finalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            console.error('PDF encryption failed:', err);
+            alert(`加密失败: ${err.message}`);
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+        }
+    }
+
+    // Apply custom watermark using Canvas rendering (offline & system fonts supported)
+    async function applyPdfWatermark() {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        
+        try {
+            await getActivePdfBytes();
+        } catch (e) {
+            console.error('编译 PDF 失败:', e);
+            alert(`编译 PDF 失败: ${e.message}`);
+            return;
+        }
+        
+        const textInput = document.getElementById('pdf-ws-watermark-text');
+        const text = textInput.value.trim();
+        if (!text) {
+            alert('请输入水印文字内容！');
+            textInput.focus();
+            return;
+        }
+        
+        const fontSize = parseInt(document.getElementById('pdf-ws-watermark-size').value) || 24;
+        const angle = parseInt(document.getElementById('pdf-ws-watermark-angle').value) || -45;
+        const opacity = parseFloat(document.getElementById('pdf-ws-watermark-opacity').value) || 0.25;
+        const color = document.getElementById('pdf-ws-watermark-color').value || '#8b5cf6';
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(10, '正在生成离线文字水印...', '利用浏览器 Canvas 引擎栅格化文字...', '0 / 1', currentPdfFile.name);
+        
+        try {
+            pdfCleanupOutputUrl();
+            const pdfDoc = await PDFLib.PDFDocument.load(currentPdfBytes.slice(0));
+            const pages = pdfDoc.getPages();
+            
+            // Create a high-DPI canvas to draw the watermark text so it looks high-quality
+            const canvas = document.createElement('canvas');
+            const scaleVal = 2; // high resolution scale
+            const textWidth = Math.max(200, text.length * fontSize * 1.2);
+            const textHeight = fontSize * 2.5;
+            
+            canvas.width = textWidth * scaleVal;
+            canvas.height = textHeight * scaleVal;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scaleVal, scaleVal);
+            
+            // Render text
+            ctx.font = `bold ${fontSize}px "Microsoft YaHei", "PingFang SC", sans-serif`;
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, textWidth / 2, textHeight / 2);
+            
+            // Convert Canvas to PNG blob bytes
+            const dataUrl = canvas.toDataURL('image/png');
+            const pngResp = await fetch(dataUrl);
+            const pngArrayBuffer = await pngResp.arrayBuffer();
+            
+            updatePdfProgress(40, '正在嵌入水印资源...', '优化图像资产编码...', '进行中', currentPdfFile.name);
+            const embeddedImage = await pdfDoc.embedPng(pngArrayBuffer);
+            
+            // Draw watermark on each page
+            for (let i = 0; i < pages.length; i++) {
+                const page = pages[i];
+                const pct = Math.round(40 + (i / pages.length) * 50);
+                updatePdfProgress(pct, `正在为第 ${i + 1} 页添加水印 / 共 ${pages.length} 页...`, '本地高速叠加中...', `${i + 1} / ${pages.length}`, currentPdfFile.name);
+                
+                const { width, height } = page.getSize();
+                
+                // Draw in the center
+                const drawW = textWidth;
+                const drawH = textHeight;
+                const drawX = (width - drawW) / 2;
+                const drawY = (height - drawH) / 2;
+                
+                page.drawImage(embeddedImage, {
+                    x: drawX,
+                    y: drawY,
+                    width: drawW,
+                    height: drawH,
+                    opacity: opacity,
+                    rotate: PDFLib.degrees(angle)
+                });
+            }
+            
+            updatePdfProgress(95, '正在编译打包 PDF...', '离线输出保存中...', '导出中', currentPdfFile.name);
+            const watermarkedBytes = await pdfDoc.save();
+            const blob = new Blob([watermarkedBytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = 'PDF 添加水印成功！';
+            document.getElementById('pdf-result-desc').innerText = `已成功在本地为 PDF 文档的所有页面叠加防伪文字水印。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            const finalName = getExportPdfName('[watermarked]');
+            document.getElementById('pdf-result-detail').innerText = `生成文件：${finalName}`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = finalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            console.error('PDF watermark failed:', err);
+            alert(`添加水印失败: ${err.message}`);
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+        }
+    }
+
+    // Render Image Workspace grid cards
+    function renderImageThumbnails() {
+        const grid = document.getElementById('pdf-images-grid-view');
+        grid.innerHTML = '';
+        
+        uploadedImages.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'pdf-image-card';
+            card.innerHTML = `
+                <span class="pdf-thumbnail-page-badge">${index + 1}</span>
+                <img src="${item.dataUrl}" alt="image ${index + 1}">
+                <span class="pdf-thumbnail-card-name" title="${item.name}">${item.name}</span>
+                <div class="pdf-image-card-actions">
+                    <button class="pdf-btn-icon btn-ws-img-up" data-idx="${index}" title="左移" style="width: 24px; height: 24px; font-size: 10px; padding:0;">◀</button>
+                    <button class="pdf-btn-icon btn-ws-img-down" data-idx="${index}" title="右移" style="width: 24px; height: 24px; font-size: 10px; padding:0;">▶</button>
+                    <button class="pdf-btn-icon pdf-btn-icon-danger btn-ws-img-remove" data-idx="${index}" title="删除" style="width: 24px; height: 24px; font-size: 10px; padding:0;">×</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        
+        // Re-bind actions
+        grid.querySelectorAll('.btn-ws-img-up').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                if (idx > 0) {
+                    const temp = uploadedImages[idx];
+                    uploadedImages[idx] = uploadedImages[idx - 1];
+                    uploadedImages[idx - 1] = temp;
+                    renderImageThumbnails();
+                    updateImageWsMetadata();
+                }
+            });
+        });
+        
+        grid.querySelectorAll('.btn-ws-img-down').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                if (idx < uploadedImages.length - 1) {
+                    const temp = uploadedImages[idx];
+                    uploadedImages[idx] = uploadedImages[idx + 1];
+                    uploadedImages[idx + 1] = temp;
+                    renderImageThumbnails();
+                    updateImageWsMetadata();
+                }
+            });
+        });
+        
+        grid.querySelectorAll('.btn-ws-img-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                uploadedImages.splice(idx, 1);
+                if (uploadedImages.length === 0) {
+                    resetPdfWs();
+                } else {
+                    renderImageThumbnails();
+                    updateImageWsMetadata();
+                }
+            });
+        });
+    }
+
+    // Update metadata info card in Image Mode
+    function updateImageWsMetadata() {
+        if (uploadedImages.length === 0) return;
+        document.getElementById('pdf-ws-meta-name').innerText = uploadedImages[0].name + (uploadedImages.length > 1 ? ` 等 (${uploadedImages.length}个文件)` : '');
+        document.getElementById('pdf-ws-meta-name').title = uploadedImages.map(img => img.name).join(', ');
+        const totalBytes = uploadedImages.reduce((sum, img) => sum + img.size, 0);
+        document.getElementById('pdf-ws-meta-size').innerText = formatBytes(totalBytes);
+        document.getElementById('pdf-ws-meta-pages').innerText = `${uploadedImages.length} 张图片`;
+        document.getElementById('pdf-ws-meta-pages-row').style.display = 'flex';
+    }
+
+    // Set up drag & drop for appending images to workspace view
+    setupPdfDragDrop(document.getElementById('pdf-images-grid-view'), null, async (files) => {
+        const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.bmp'];
+        const imageFiles = Array.from(files).filter(f => 
+            f.type.startsWith('image/') || allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
+        );
+        if (imageFiles.length === 0) return;
+        
+        for (let i = 0; i < imageFiles.length; i++) {
+            const imgFile = imageFiles[i];
+            const item = {
+                file: imgFile,
+                name: imgFile.name,
+                size: imgFile.size,
+                dataUrl: ''
+            };
+            uploadedImages.push(item);
+            
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    item.dataUrl = e.target.result;
+                    resolve();
+                };
+                reader.readAsDataURL(imgFile);
+            });
+        }
+        
+        renderImageThumbnails();
+        updateImageWsMetadata();
+    });
+
+    // --------------------------------------------------------------------------
+    // ACTION 1: PDF SPLIT
+    // --------------------------------------------------------------------------
+    const btnWsPdfSplit = document.getElementById('btn-ws-pdf-split');
+    const pdfWsSplitRange = document.getElementById('pdf-ws-split-range');
+
+    btnWsPdfSplit.addEventListener('click', async () => {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        
+        try {
+            await getActivePdfBytes();
+        } catch (e) {
+            console.error('编译 PDF 失败:', e);
+            alert(`编译 PDF 失败: ${e.message}`);
+            return;
+        }
+        
+        const rangeText = pdfWsSplitRange.value.trim();
+        if (!rangeText) {
+            alert('请输入要拆分提取的页码范围！');
+            pdfWsSplitRange.focus();
+            return;
+        }
+        
+        let pagesToExtract = [];
+        try {
+            pagesToExtract = parseRanges(rangeText, currentPdfPageCount);
+        } catch (e) {
+            alert(`页码范围错误: ${e.message}\n\n请使用形如 1-3, 5 等格式进行指定。`);
+            pdfWsSplitRange.focus();
+            return;
+        }
+        
+        if (pagesToExtract.length === 0) {
+            alert('未匹配到有效页码！');
+            return;
+        }
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(20, '正在载入 PDF 字节文档...', '配置内存渲染空间...', '准备中', currentPdfFile.name);
+        
+        try {
+            pdfCleanupOutputUrl();
+            const srcDoc = await PDFLib.PDFDocument.load(currentPdfBytes.slice(0));
+            const splitDoc = await PDFLib.PDFDocument.create();
+            
+            updatePdfProgress(50, '正在提取导出指定页面...', `共提取页数: ${pagesToExtract.length} 页`, '复制页面中', currentPdfFile.name);
+            const copiedPages = await splitDoc.copyPages(srcDoc, pagesToExtract);
+            copiedPages.forEach(p => splitDoc.addPage(p));
+            
+            updatePdfProgress(85, '正在输出保存 PDF...', '离线快速合并压缩中...', '输出中', currentPdfFile.name);
+            const splitPdfBytes = await splitDoc.save();
+            const blob = new Blob([splitPdfBytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = 'PDF 拆分提取成功！';
+            document.getElementById('pdf-result-desc').innerText = `成功从原 PDF 中提取了第 ${rangeText} 页，生成新的单份文档。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            const finalName = getExportPdfName('[split]');
+            document.getElementById('pdf-result-detail').innerText = `生成文件：${finalName}`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = finalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+            console.error('PDF Split failed:', err);
+            alert(`拆分提取失败: ${err.message}`);
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // ACTION 2: PDF TO IMAGES
+    // --------------------------------------------------------------------------
+    const btnWsPdfToImg = document.getElementById('btn-ws-pdf-toimg');
+    const pdfWsToImgFormat = document.getElementById('pdf-ws-toimg-format');
+    const pdfWsToImgScale = document.getElementById('pdf-ws-toimg-scale');
+
+    btnWsPdfToImg.addEventListener('click', async () => {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        
+        try {
+            await getActivePdfBytes();
+        } catch (e) {
+            console.error('编译 PDF 失败:', e);
+            alert(`编译 PDF 失败: ${e.message}`);
+            return;
+        }
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(5, '正在加载本地 PDF 解析引擎...', '读取页面高保真几何信息...', '0 / ' + currentPdfPageCount, currentPdfPageCount + ' 页');
+        
+        try {
+            await initPdfJs();
+            renderedImagesList = [];
+            
+            const loadingTask = pdfjsLib.getDocument({ data: currentPdfBytes.slice(0) });
+            const pdf = await loadingTask.promise;
+            
+            const formatMime = pdfWsToImgFormat.value;
+            const formatExt = formatMime === 'image/png' ? 'png' : 'jpg';
+            const scale = parseFloat(pdfWsToImgScale.value);
+            
+            for (let pageNum = 1; pageNum <= currentPdfPageCount; pageNum++) {
+                const pct = Math.round(5 + (pageNum / currentPdfPageCount) * 90);
+                updatePdfProgress(pct, `正在渲染导出第 ${pageNum} 页 / 共 ${currentPdfPageCount} 页`, '使用 HTML5 Canvas 绘制像素...', `${pageNum} / ${currentPdfPageCount}`, currentPdfPageCount + ' 页');
+                
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: scale });
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, formatMime, 0.95));
+                const dataUrl = URL.createObjectURL(blob);
+                
+                renderedImagesList.push({
+                    blob: blob,
+                    dataUrl: dataUrl,
+                    pageNum: pageNum,
+                    name: `page_${pageNum}.${formatExt}`
+                });
+                
+                canvas.width = 0;
+                canvas.height = 0;
+            }
+            
+            displayPdfWsRenderedImages(formatExt);
+        } catch (err) {
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+            console.error('PDF to Image conversion failed:', err);
+            alert(`导出图片失败: ${err.message}`);
+        }
+    });
+
+    function displayPdfWsRenderedImages(ext) {
+        document.getElementById('pdf-progress-panel').style.display = 'none';
+        
+        document.getElementById('pdf-result-images-desc').innerText = `共在本地高保真渲染出 ${renderedImagesList.length} 页图片，提供免费离线下载。`;
+        
+        const grid = document.getElementById('pdf-rendered-images-grid');
+        grid.innerHTML = '';
+        
+        renderedImagesList.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'pdf-export-card';
+            card.innerHTML = `
+                <div class="pdf-export-img-wrapper">
+                    <img src="${item.dataUrl}" alt="page ${item.pageNum}">
+                </div>
+                <div class="pdf-export-info">
+                    <span class="pdf-export-page-num">第 ${item.pageNum} 页</span>
+                    <a href="${item.dataUrl}" download="${currentPdfFile.name.replace('.pdf', '')}_page_${item.pageNum}.${ext}" class="btn btn-secondary btn-xs pdf-export-btn-single">下载单页</a>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+        // ZIP Packaging
+        document.getElementById('btn-pdf-download-all-zip').onclick = async () => {
+            const zipBtn = document.getElementById('btn-pdf-download-all-zip');
+            const origText = zipBtn.innerHTML;
+            zipBtn.disabled = true;
+            zipBtn.innerHTML = '<span>📦 正在本地压缩打包...</span>';
+            
+            try {
+                const zip = new JSZip();
+                renderedImagesList.forEach(item => {
+                    zip.file(`${currentPdfFile.name.replace('.pdf', '')}_${item.name}`, item.blob);
+                });
+                
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const zipUrl = URL.createObjectURL(zipBlob);
+                
+                const a = document.createElement('a');
+                a.href = zipUrl;
+                a.download = `[images]_${currentPdfFile.name.replace('.pdf', '')}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                setTimeout(() => URL.revokeObjectURL(zipUrl), 3000);
+            } catch (e) {
+                console.error('ZIP compilation failed:', e);
+                alert('打包 ZIP 失败: ' + e.message);
+            } finally {
+                zipBtn.disabled = false;
+                zipBtn.innerHTML = origText;
+            }
+        };
+
+        document.getElementById('pdf-result-images-panel').style.display = 'flex';
+    }
+
+    document.getElementById('pdf-btn-images-reset').addEventListener('click', () => {
+        renderedImagesList.forEach(item => {
+            if (item.dataUrl) URL.revokeObjectURL(item.dataUrl);
+        });
+        document.getElementById('pdf-result-images-panel').style.display = 'none';
+        resetPdfWs();
+    });
+
+    // --------------------------------------------------------------------------
+    // ACTION 3: PDF APPEND & MERGE
+    // --------------------------------------------------------------------------
+    const btnWsMergeAdd = document.getElementById('btn-ws-merge-add');
+    const pdfWsMergeList = document.getElementById('pdf-ws-merge-list');
+    const btnWsPdfMerge = document.getElementById('btn-ws-pdf-merge');
+
+    btnWsMergeAdd.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf';
+        input.multiple = true;
+        input.onchange = (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => {
+                    if (file.name.toLowerCase().endsWith('.pdf')) {
+                        mergePdfQueue.push({
+                            file: file,
+                            name: file.name,
+                            size: file.size
+                        });
+                    }
+                });
+                renderPdfWsMergeQueue();
+            }
+        };
+        input.click();
+    });
+
+    function renderPdfWsMergeQueue() {
+        pdfWsMergeList.innerHTML = '';
+        mergePdfQueue.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'pdf-queue-item';
+            div.style.padding = '8px 12px';
+            div.style.borderRadius = 'var(--radius-sm)';
+            div.innerHTML = `
+                <div class="pdf-queue-item-info" style="gap: 8px;">
+                    <span class="pdf-queue-index" style="width: auto; font-size: 11px;">${index + 1}</span>
+                    <span class="pdf-queue-name" title="${item.name}" style="max-width: 120px; font-size: 11px;">${item.name}</span>
+                    <span class="pdf-queue-size" style="font-size: 9px;">${formatBytes(item.size)}</span>
+                </div>
+                <div class="pdf-queue-actions" style="gap: 4px;">
+                    <button class="pdf-btn-icon btn-ws-merge-up" data-idx="${index}" title="上移" style="width: 22px; height: 22px; font-size: 8px; padding:0;">▲</button>
+                    <button class="pdf-btn-icon btn-ws-merge-down" data-idx="${index}" title="下移" style="width: 22px; height: 22px; font-size: 8px; padding:0;">▼</button>
+                    <button class="pdf-btn-icon pdf-btn-icon-danger btn-ws-merge-remove" data-idx="${index}" title="删除" style="width: 22px; height: 22px; font-size: 8px; padding:0; ${index === 0 ? 'display:none;' : ''}">×</button>
+                </div>
+            `;
+            pdfWsMergeList.appendChild(div);
+        });
+
+        // Hooks
+        pdfWsMergeList.querySelectorAll('.btn-ws-merge-up').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                if (idx > 0) {
+                    const temp = mergePdfQueue[idx];
+                    mergePdfQueue[idx] = mergePdfQueue[idx - 1];
+                    mergePdfQueue[idx - 1] = temp;
+                    renderPdfWsMergeQueue();
+                }
+            });
+        });
+
+        pdfWsMergeList.querySelectorAll('.btn-ws-merge-down').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                if (idx < mergePdfQueue.length - 1) {
+                    const temp = mergePdfQueue[idx];
+                    mergePdfQueue[idx] = mergePdfQueue[idx + 1];
+                    mergePdfQueue[idx + 1] = temp;
+                    renderPdfWsMergeQueue();
+                }
+            });
+        });
+
+        pdfWsMergeList.querySelectorAll('.btn-ws-merge-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.getAttribute('data-idx'));
+                mergePdfQueue.splice(idx, 1);
+                renderPdfWsMergeQueue();
+            });
+        });
+    }
+
+    btnWsPdfMerge.addEventListener('click', async () => {
+        if (mergePdfQueue.length < 2) {
+            alert('请在追加列表中添加至少 2 个 PDF 文件进行合并！');
+            return;
+        }
+
+        // Compile any visual mutations into the first item of the merge queue
+        if (currentPdfFile && originalPdfBytes) {
+            try {
+                const compiled = await getActivePdfBytes();
+                mergePdfQueue[0] = {
+                    file: new File([compiled], currentPdfFile.name, { type: 'application/pdf' }),
+                    name: currentPdfFile.name,
+                    size: compiled.byteLength
+                };
+            } catch (e) {
+                console.error('编译 PDF 失败:', e);
+                alert(`编译 PDF 失败: ${e.message}`);
+                return;
+            }
+        }
+
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(10, '正在初始化 PDF 合并器...', '准备内存虚拟空间...', '0 / ' + mergePdfQueue.length, mergePdfQueue.length + ' 个文件');
+
+        try {
+            pdfCleanupOutputUrl();
+            const mergedPdf = await PDFLib.PDFDocument.create();
+            
+            for (let i = 0; i < mergePdfQueue.length; i++) {
+                const item = mergePdfQueue[i];
+                const pct = Math.round(10 + (i / mergePdfQueue.length) * 80);
+                updatePdfProgress(pct, `正在加载文件: ${item.name}`, `导入第 ${i+1} 份文档中...`, `${i} / ${mergePdfQueue.length}`, mergePdfQueue.length + ' 个文件');
+                
+                const arrayBuffer = await item.file.arrayBuffer();
+                const srcDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pageIndices = srcDoc.getPageIndices();
+                const pages = await mergedPdf.copyPages(srcDoc, pageIndices);
+                
+                pages.forEach(page => mergedPdf.addPage(page));
+            }
+
+            updatePdfProgress(90, '正在合并生成 PDF 文件...', '正在编译保存，这在本地大概需要几秒钟...', '导出中', mergePdfQueue.length + ' 个文件');
+            const mergedPdfBytes = await mergedPdf.save();
+            const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = 'PDF 文件合并成功！';
+            document.getElementById('pdf-result-desc').innerText = `成功将 ${mergePdfQueue.length} 份 PDF 文档在本地按顺序合并为一个文件。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            document.getElementById('pdf-result-detail').innerText = `生成文件：[merged]_${Date.now()}.pdf`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = `[merged]_${Date.now()}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+            console.error('PDF Merge failed:', err);
+            alert(`合并失败: ${err.message}`);
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // ACTION 4: IMAGES TO PDF (IMAGE MODE)
+    // --------------------------------------------------------------------------
+    const pdfWsImg2pdfSize = document.getElementById('pdf-ws-img2pdf-size');
+    const pdfWsImg2pdfOrientation = document.getElementById('pdf-ws-img2pdf-orientation');
+    const pdfWsImg2pdfFit = document.getElementById('pdf-ws-img2pdf-fit');
+    const btnWsPdfImg2pdf = document.getElementById('btn-ws-pdf-img2pdf');
+
+    // Toggle orientation and fit based on size choice
+    pdfWsImg2pdfSize.addEventListener('change', () => {
+        const val = pdfWsImg2pdfSize.value;
+        const orientRow = document.getElementById('pdf-ws-img2pdf-orient-row');
+        const fitRow = document.getElementById('pdf-ws-img2pdf-fit-row');
+        if (val === 'auto') {
+            if (orientRow) orientRow.style.display = 'none';
+            if (fitRow) fitRow.style.display = 'none';
+        } else {
+            if (orientRow) orientRow.style.display = 'block';
+            if (fitRow) fitRow.style.display = 'block';
+        }
+    });
+
+    btnWsPdfImg2pdf.addEventListener('click', async () => {
+        if (uploadedImages.length === 0) return;
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(10, '正在初始化 PDF 生成器...', '准备页面载入空间...', '0 / ' + uploadedImages.length, uploadedImages.length + ' 张图片');
+
+        try {
+            pdfCleanupOutputUrl();
+            const pdfDoc = await PDFLib.PDFDocument.create();
+            
+            const pageSizeSelect = pdfWsImg2pdfSize.value;
+            const orientation = pdfWsImg2pdfOrientation.value;
+            const fitMode = pdfWsImg2pdfFit.value;
+
+            for (let i = 0; i < uploadedImages.length; i++) {
+                const item = uploadedImages[i];
+                const pct = Math.round(10 + (i / uploadedImages.length) * 80);
+                updatePdfProgress(pct, `正在压缩并植入图片: ${item.name}`, `本地读取像素几何体中...`, `${i} / ${uploadedImages.length}`, uploadedImages.length + ' 张图片');
+                
+                const arrayBuffer = await item.file.arrayBuffer();
+                let embeddedImage;
+                
+                if (item.file.type === 'image/png' || item.name.toLowerCase().endsWith('.png')) {
+                    embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+                } else {
+                    embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+                }
+
+                const imgWidth = embeddedImage.width;
+                const imgHeight = embeddedImage.height;
+                
+                let pageW = imgWidth;
+                let pageH = imgHeight;
+                
+                if (pageSizeSelect === 'a4') {
+                    pageW = orientation === 'portrait' ? 595 : 842;
+                    pageH = orientation === 'portrait' ? 842 : 595;
+                } else if (pageSizeSelect === 'letter') {
+                    pageW = orientation === 'portrait' ? 612 : 792;
+                    pageH = orientation === 'portrait' ? 792 : 612;
+                }
+                
+                const page = pdfDoc.addPage([pageW, pageH]);
+                
+                if (pageSizeSelect === 'auto') {
+                    page.drawImage(embeddedImage, {
+                        x: 0,
+                        y: 0,
+                        width: pageW,
+                        height: pageH
+                    });
+                } else {
+                    const scaleX = pageW / imgWidth;
+                    const scaleY = pageH / imgHeight;
+                    
+                    let drawWidth = pageW;
+                    let drawHeight = pageH;
+                    let drawX = 0;
+                    let drawY = 0;
+                    
+                    if (fitMode === 'contain') {
+                        const ratio = Math.min(scaleX, scaleY);
+                        drawWidth = imgWidth * ratio;
+                        drawHeight = imgHeight * ratio;
+                        drawX = (pageW - drawWidth) / 2;
+                        drawY = (pageH - drawHeight) / 2;
+                    } else {
+                        const ratio = Math.max(scaleX, scaleY);
+                        drawWidth = imgWidth * ratio;
+                        drawHeight = imgHeight * ratio;
+                        drawX = (pageW - drawWidth) / 2;
+                        drawY = (pageH - drawHeight) / 2;
+                    }
+                    
+                    page.drawImage(embeddedImage, {
+                        x: drawX,
+                        y: drawY,
+                        width: drawWidth,
+                        height: drawHeight
+                    });
+                }
+            }
+
+            updatePdfProgress(90, '正在生成最终 PDF 字节...', '本地编码编译输出...', '导出中', uploadedImages.length + ' 张图片');
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = '图片转 PDF 成功！';
+            document.getElementById('pdf-result-desc').innerText = `已将 ${uploadedImages.length} 张本地图片按顺序生成单份排版完好的 PDF 电子书文档。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            document.getElementById('pdf-result-detail').innerText = `生成文件：images_to_doc_${Date.now()}.pdf`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = `images_to_doc_${Date.now()}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+            console.error('Images to PDF failed:', err);
+            alert(`生成 PDF 失败: ${err.message}`);
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // ACTION 5: PDF ENCRYPTION & WATERMARK BINDINGS
+    // --------------------------------------------------------------------------
+    document.getElementById('btn-ws-pdf-encrypt').addEventListener('click', async () => {
+        await encryptPdf();
+    });
+
+    document.getElementById('btn-ws-pdf-watermark').addEventListener('click', async () => {
+        await applyPdfWatermark();
+    });
+
+    document.getElementById('btn-ws-pdf-export').addEventListener('click', async () => {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        
+        pdfWorkspacePanel.style.display = 'none';
+        document.getElementById('pdf-progress-panel').style.display = 'block';
+        updatePdfProgress(30, '正在编译 PDF 文档...', '正在整合您的修改 (删除、旋转、排序)...', '进行中', currentPdfFile.name);
+        
+        try {
+            pdfCleanupOutputUrl();
+            const bytes = await getActivePdfBytes();
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            pdfOutputBlobUrl = URL.createObjectURL(blob);
+            
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            
+            document.getElementById('pdf-result-title').innerText = 'PDF 导出成功！';
+            document.getElementById('pdf-result-desc').innerText = `已将您所有的修改（删除、旋转、排序）编译成最终文档。`;
+            document.getElementById('pdf-result-size').innerText = formatBytes(blob.size);
+            const finalName = getExportPdfName('[modified]');
+            document.getElementById('pdf-result-detail').innerText = `生成文件：${finalName}`;
+            
+            document.getElementById('pdf-btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = pdfOutputBlobUrl;
+                a.download = finalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            
+            document.getElementById('pdf-result-file-panel').style.display = 'flex';
+        } catch (err) {
+            console.error('导出 PDF 失败:', err);
+            alert(`导出 PDF 失败: ${err.message}`);
+            document.getElementById('pdf-progress-panel').style.display = 'none';
+            pdfWorkspacePanel.style.display = 'grid';
+        }
+    });
+
+    // --------------------------------------------------------------------------
+    // WORKSPACE CLOSE / RESET HANDLERS
+    // --------------------------------------------------------------------------
+    function resetPdfWs() {
+        currentPdfFile = null;
+        currentPdfBytes = null;
+        originalPdfBytes = null;
+        currentPdfPageCount = 0;
+        uploadedImages = [];
+        mergePdfQueue = [];
+        renderedImagesList = [];
+        
+        pdfMainFileInput.value = '';
+        pdfWsSplitRange.value = '';
+        
+        const deleteRangeInput = document.getElementById('pdf-ws-delete-range');
+        if (deleteRangeInput) {
+            deleteRangeInput.value = '';
+        }
+        const descText = document.getElementById('pdf-ws-delete-selected-text');
+        if (descText) {
+            descText.innerText = '提示：支持在右侧直接点击缩略图勾选，或在此处输入页码。';
+        }
+
+        // Reset security encryption fields
+        const encryptPwInput = document.getElementById('pdf-ws-encrypt-pw');
+        if (encryptPwInput) encryptPwInput.value = '';
+        const encryptCopyCheck = document.getElementById('pdf-ws-encrypt-restrict-copy');
+        if (encryptCopyCheck) encryptCopyCheck.checked = false;
+        const encryptPrintCheck = document.getElementById('pdf-ws-encrypt-restrict-print');
+        if (encryptPrintCheck) encryptPrintCheck.checked = false;
+
+        // Reset watermark fields
+        const wmTextInput = document.getElementById('pdf-ws-watermark-text');
+        if (wmTextInput) wmTextInput.value = '';
+        const wmSizeInput = document.getElementById('pdf-ws-watermark-size');
+        if (wmSizeInput) wmSizeInput.value = '24';
+        const wmAngleInput = document.getElementById('pdf-ws-watermark-angle');
+        if (wmAngleInput) wmAngleInput.value = '-45';
+        const wmOpacityInput = document.getElementById('pdf-ws-watermark-opacity');
+        if (wmOpacityInput) wmOpacityInput.value = '0.25';
+        const wmColorInput = document.getElementById('pdf-ws-watermark-color');
+        if (wmColorInput) wmColorInput.value = '#8b5cf6';
+        
+        document.getElementById('pdf-ws-meta-name').value = '';
+        document.getElementById('pdf-ws-meta-size').innerText = '-';
+        document.getElementById('pdf-ws-meta-pages').innerText = '-';
+        document.getElementById('pdf-ws-merge-list').innerHTML = '';
+        document.getElementById('pdf-viewer-grid').innerHTML = '';
+        document.getElementById('pdf-images-grid-view').innerHTML = '';
+        document.getElementById('pdf-images-grid-view').classList.remove('grid-active');
+        
+        pdfWorkspacePanel.style.display = 'none';
+        pdfMainUploadPanel.style.display = 'flex';
+    }
+
+    document.getElementById('pdf-btn-reset').addEventListener('click', () => {
+        pdfCleanupOutputUrl();
+        document.getElementById('pdf-result-file-panel').style.display = 'none';
+        resetPdfWs();
+    });
+
+    document.getElementById('btn-ws-pdf-close').addEventListener('click', () => {
+        resetPdfWs();
+    });
+
+    // Bi-directional Range delete input listener
+    const pdfWsDeleteRange = document.getElementById('pdf-ws-delete-range');
+    pdfWsDeleteRange.addEventListener('input', () => {
+        const val = pdfWsDeleteRange.value.trim();
+        const cards = document.querySelectorAll('#pdf-viewer-grid .pdf-thumbnail-card');
+        
+        cards.forEach(card => card.classList.remove('selected'));
+        if (!val) {
+            document.getElementById('pdf-ws-delete-selected-text').innerText = '提示：支持在右侧直接点击缩略图勾选，或在此处输入页码。';
+            return;
+        }
+        
+        try {
+            const pagesToSelect = parseRanges(val, currentPdfPageCount);
+            pagesToSelect.forEach(idx => {
+                const card = document.querySelector(`#pdf-viewer-grid .pdf-thumbnail-card[data-page-num="${idx + 1}"]`);
+                if (card) {
+                    card.classList.add('selected');
+                }
+            });
+            document.getElementById('pdf-ws-delete-selected-text').innerText = `已输入要删除的页码，共匹配到 ${pagesToSelect.length} 页。`;
+        } catch (e) {
+            document.getElementById('pdf-ws-delete-selected-text').innerText = '输入格式错误或页码超出范围...';
+        }
+    });
+
+    // Batch delete execution listener
+    const btnWsPdfDeleteBatch = document.getElementById('btn-ws-pdf-delete-batch');
+    btnWsPdfDeleteBatch.addEventListener('click', async () => {
+        if (!currentPdfBytes || !currentPdfFile) return;
+        const rangeText = pdfWsDeleteRange.value.trim();
+        if (!rangeText) {
+            alert('请勾选页面或输入要批量删除的页码范围！');
+            pdfWsDeleteRange.focus();
+            return;
+        }
+        
+        let pagesToDelete = [];
+        try {
+            pagesToDelete = parseRanges(rangeText, currentPdfPageCount);
+        } catch (e) {
+            alert(`页码格式解析错误:\n${e.message}\n\n请使用形如 1-3, 5 等格式进行指定。`);
+            pdfWsDeleteRange.focus();
+            return;
+        }
+        
+        if (pagesToDelete.length === 0) {
+            alert('解析出的删除页数为 0，请输入有效的页码。');
+            return;
+        }
+        
+        if (!confirm(`确定要删除第 ${rangeText} 页吗？共 ${pagesToDelete.length} 页。`)) {
+            return;
+        }
+        
+        // 1. Visual DOM Update (Instant!)
+        const grid = document.getElementById('pdf-viewer-grid');
+        const cards = Array.from(grid.querySelectorAll('.pdf-thumbnail-card'));
+        pagesToDelete.forEach(idx => {
+            if (cards[idx]) {
+                cards[idx].remove();
+            }
+        });
+        
+        reindexPdfThumbnails();
+        
+        if (currentPdfPageCount === 0) {
+            alert('所有页面都已删除！');
+            resetPdfWs();
+            return;
+        }
+        
+        pdfWsDeleteRange.value = '';
+        document.getElementById('pdf-ws-delete-selected-text').innerText = '提示：支持在右侧直接点击缩略图勾选，或在此处输入页码。';
+    });
+
+    // Helper: Shared drag-and-drop installer
+    function setupPdfDragDrop(dropZoneEl, inputEl, callback) {
+        if (!dropZoneEl) return;
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, () => dropZoneEl.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, () => dropZoneEl.classList.remove('dragover'), false);
+        });
+
+        dropZoneEl.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length > 0) {
+                callback(files);
+            }
+        });
+
+        if (inputEl) {
+            dropZoneEl.addEventListener('click', () => {
+                inputEl.click();
+            });
+
+            inputEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            inputEl.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    callback(e.target.files);
+                }
+            });
+        }
+    }
+
+    // Helper: Parse extraction string, e.g. "1-3, 5, 8-10" -> [0, 1, 2, 4, 7, 8, 9] (0-indexed)
+    function parseRanges(str, maxVal) {
+        const pages = [];
+        const parts = str.split(',');
+        for (let part of parts) {
+            part = part.trim();
+            if (!part) continue;
+            if (part.includes('-')) {
+                const [startStr, endStr] = part.split('-');
+                const start = parseInt(startStr.trim());
+                const end = parseInt(endStr.trim());
+                if (isNaN(start) || isNaN(end) || start < 1 || end > maxVal || start > end) {
+                    throw new Error(`页码范围无效: ${part}，总页数限制为 1 - ${maxVal}`);
+                }
+                for (let i = start; i <= end; i++) {
+                    pages.push(i - 1);
+                }
+            } else {
+                const val = parseInt(part);
+                if (isNaN(val) || val < 1 || val > maxVal) {
+                    throw new Error(`页码无效: ${part}，总页数限制为 1 - ${maxVal}`);
+                }
+                pages.push(val - 1);
+            }
+        }
+        return [...new Set(pages)]; // Deduplicate and return
+    }
+
+
+    function parseAudioFFmpegLog(message) {
+        if (message.includes('time=')) {
+            const timeMatch = message.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+            if (timeMatch && audioTotalDuration > 0) {
+                const hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const seconds = parseInt(timeMatch[3]);
+                const centiseconds = parseInt(timeMatch[4]);
+                
+                const currentSeconds = (hours * 3600) + (minutes * 60) + seconds + (centiseconds / 100);
+                let percentage = Math.round((currentSeconds / audioTotalDuration) * 100);
+                percentage = Math.max(0, Math.min(99, percentage));
+                updateAudioProgress(percentage);
+            }
+        }
+    }
+
+    // ==========================================================================
+    // 12. DEVELOPER UTILITIES SUITE LOGIC (100% OFFLINE / CLIENT-SIDE)
+    // ==========================================================================
+
+    // Clean and fast custom MD5/HMAC-MD5 implementation using Int32Array
+    function md5(data) {
+        let bytes;
+        if (typeof data === 'string') {
+            const encoder = new TextEncoder();
+            bytes = encoder.encode(data);
+        } else if (data instanceof Uint8Array) {
+            bytes = data;
+        } else if (data instanceof ArrayBuffer) {
+            bytes = new Uint8Array(data);
+        } else {
+            return '';
+        }
+
+        function rotateLeft(n, c) {
+            return (n << c) | (n >>> (32 - c));
+        }
+        
+        function safeAdd(x, y) {
+            const lsw = (x & 0xffff) + (y & 0xffff);
+            const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+            return (msw << 16) | (lsw & 0xffff);
+        }
+
+        function md5cmn(q, a, b, x, s, t) {
+            return safeAdd(rotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b);
+        }
+        function md5ff(a, b, c, d, x, s, t) {
+            return md5cmn((b & c) | (~b & d), a, b, x, s, t);
+        }
+        function md5gg(a, b, c, d, x, s, t) {
+            return md5cmn((b & d) | (c & ~d), a, b, x, s, t);
+        }
+        function md5hh(a, b, c, d, x, s, t) {
+            return md5cmn(b ^ c ^ d, a, b, x, s, t);
+        }
+        function md5ii(a, b, c, d, x, s, t) {
+            return md5cmn(c ^ (b | ~d), a, b, x, s, t);
+        }
+
+        const len = bytes.length;
+        const words = new Int32Array(((len + 8) >> 6) * 16 + 16);
+        for (let i = 0; i < len; i++) {
+            words[i >> 2] |= (bytes[i] & 0xff) << ((i % 4) * 8);
+        }
+        words[len >> 2] |= 0x80 << ((len % 4) * 8);
+        
+        const wordCount = ((len + 8) >> 6) * 16 + 14;
+        words[wordCount] = len * 8;
+
+        let a = 1732584193;
+        let b = -271733879;
+        let c = -1732584194;
+        let d = 271733878;
+
+        for (let i = 0; i < words.length; i += 16) {
+            const olda = a;
+            const oldb = b;
+            const oldc = c;
+            const oldd = d;
+
+            a = md5ff(a, b, c, d, words[i + 0], 7, -680876936);
+            d = md5ff(d, a, b, c, words[i + 1], 12, -389564586);
+            c = md5ff(c, d, a, b, words[i + 2], 17,  606105819);
+            b = md5ff(b, c, d, a, words[i + 3], 22, -1044525330);
+            a = md5ff(a, b, c, d, words[i + 4], 7, -176418897);
+            d = md5ff(d, a, b, c, words[i + 5], 12,  1200080426);
+            c = md5ff(c, d, a, b, words[i + 6], 17, -1473231341);
+            b = md5ff(b, c, d, a, words[i + 7], 22, -45705983);
+            a = md5ff(a, b, c, d, words[i + 8], 7,  1770035416);
+            d = md5ff(d, a, b, c, words[i + 9], 12, -1958414417);
+            c = md5ff(c, d, a, b, words[i + 10], 17, -42063);
+            b = md5ff(b, c, d, a, words[i + 11], 22, -1990404162);
+            a = md5ff(a, b, c, d, words[i + 12], 7,  1804603682);
+            d = md5ff(d, a, b, c, words[i + 13], 12, -40341101);
+            c = md5ff(c, d, a, b, words[i + 14], 17, -1502002290);
+            b = md5ff(b, c, d, a, words[i + 15], 22,  1236535329);
+
+            a = md5gg(a, b, c, d, words[i + 1], 5, -165796510);
+            d = md5gg(d, a, b, c, words[i + 6], 9, -1069501632);
+            c = md5gg(c, d, a, b, words[i + 11], 14,  643717713);
+            b = md5gg(b, c, d, a, words[i + 0], 20, -373897302);
+            a = md5gg(a, b, c, d, words[i + 5], 5, -701558691);
+            d = md5gg(d, a, b, c, words[i + 10], 9,  38016083);
+            c = md5gg(c, d, a, b, words[i + 15], 14, -660478335);
+            b = md5gg(b, c, d, a, words[i + 4], 20, -405537848);
+            a = md5gg(a, b, c, d, words[i + 9], 5,  568446438);
+            d = md5gg(d, a, b, c, words[i + 14], 9, -1019803690);
+            c = md5gg(c, d, a, b, words[i + 3], 14, -187363961);
+            b = md5gg(b, c, d, a, words[i + 8], 20,  1163531501);
+            a = md5gg(a, b, c, d, words[i + 13], 5, -1444681467);
+            d = md5gg(d, a, b, c, words[i + 2], 9, -51403784);
+            c = md5gg(c, d, a, b, words[i + 7], 14,  1735328473);
+            b = md5gg(b, c, d, a, words[i + 12], 20, -1926607734);
+
+            a = md5hh(a, b, c, d, words[i + 5], 4, -378558);
+            d = md5hh(d, a, b, c, words[i + 8], 11, -2022574463);
+            c = md5hh(c, d, a, b, words[i + 11], 16,  1839030562);
+            b = md5hh(b, c, d, a, words[i + 14], 23, -35309556);
+            a = md5hh(a, b, c, d, words[i + 1], 4, -1530992060);
+            d = md5hh(d, a, b, c, words[i + 4], 11,  1272893353);
+            c = md5hh(c, d, a, b, words[i + 7], 16, -155497632);
+            b = md5hh(b, c, d, a, words[i + 10], 23, -1094730640);
+            a = md5hh(a, b, c, d, words[i + 13], 4,  681279174);
+            d = md5hh(d, a, b, c, words[i + 0], 11, -358537222);
+            c = md5hh(c, d, a, b, words[i + 3], 16, -722521979);
+            b = md5hh(b, c, d, a, words[i + 6], 23,  76029189);
+            a = md5hh(a, b, c, d, words[i + 9], 4, -640364487);
+            d = md5hh(d, a, b, c, words[i + 12], 11, -421815835);
+            c = md5hh(c, d, a, b, words[i + 15], 16,  530742520);
+            b = md5hh(b, c, d, a, words[i + 2], 23, -995338651);
+
+            a = md5ii(a, b, c, d, words[i + 0], 6, -198630844);
+            d = md5ii(d, a, b, c, words[i + 7], 10,  1126891415);
+            c = md5ii(c, d, a, b, words[i + 14], 15, -1416354905);
+            b = md5ii(b, c, d, a, words[i + 5], 21, -57434055);
+            a = md5ii(a, b, c, d, words[i + 12], 6,  1700485571);
+            d = md5ii(d, a, b, c, words[i + 3], 10, -1894986606);
+            c = md5ii(c, d, a, b, words[i + 10], 15, -1051523);
+            b = md5ii(b, c, d, a, words[i + 1], 21, -2054922799);
+            a = md5ii(a, b, c, d, words[i + 8], 6,  1873313359);
+            d = md5ii(d, a, b, c, words[i + 15], 10, -30611744);
+            c = md5ii(c, d, a, b, words[i + 6], 15, -1560198380);
+            b = md5ii(b, c, d, a, words[i + 13], 21,  1309151649);
+            a = md5ii(a, b, c, d, words[i + 4], 6, -145523070);
+            d = md5ii(d, a, b, c, words[i + 11], 10, -1120210379);
+            c = md5ii(c, d, a, b, words[i + 2], 15,  718787281);
+            b = md5ii(b, c, d, a, words[i + 9], 21, -343485551);
+
+            a = safeAdd(a, olda);
+            b = safeAdd(b, oldb);
+            c = safeAdd(c, oldc);
+            d = safeAdd(d, oldd);
+        }
+
+        const hex = [];
+        const val = [a, b, c, d];
+        for (let i = 0; i < 4; i++) {
+            const v = val[i];
+            for (let j = 0; j < 4; j++) {
+                const byte = (v >>> (j * 8)) & 0xff;
+                hex.push(byte.toString(16).padStart(2, '0'));
+            }
+        }
+        return hex.join('');
+    }
+
+    function hmacMd5(text, keyString) {
+        const encoder = new TextEncoder();
+        let keyBytes = encoder.encode(keyString);
+        const messageBytes = encoder.encode(text);
+        
+        const blockSize = 64;
+        if (keyBytes.length > blockSize) {
+            const keyHashHex = md5(keyBytes);
+            const hexBytes = [];
+            for (let i = 0; i < keyHashHex.length; i += 2) {
+                hexBytes.push(parseInt(keyHashHex.substr(i, 2), 16));
+            }
+            keyBytes = new Uint8Array(hexBytes);
+        }
+        
+        const paddedKey = new Uint8Array(blockSize);
+        paddedKey.set(keyBytes);
+        
+        const ipad = new Uint8Array(blockSize);
+        const opad = new Uint8Array(blockSize);
+        for (let i = 0; i < blockSize; i++) {
+            ipad[i] = paddedKey[i] ^ 0x36;
+            opad[i] = paddedKey[i] ^ 0x5c;
+        }
+        
+        const innerMsg = new Uint8Array(blockSize + messageBytes.length);
+        innerMsg.set(ipad);
+        innerMsg.set(messageBytes, blockSize);
+        const innerHashHex = md5(innerMsg);
+        
+        const innerHashBytes = new Uint8Array(16);
+        for (let i = 0; i < 32; i += 2) {
+            innerHashBytes[i >> 1] = parseInt(innerHashHex.substr(i, 2), 16);
+        }
+        
+        const outerMsg = new Uint8Array(blockSize + 16);
+        outerMsg.set(opad);
+        outerMsg.set(innerHashBytes, blockSize);
+        
+        return md5(outerMsg);
+    }
+
+    // Helper: setup HTML Drag & Drop listeners
+    function setupDevDragDrop(dropZoneEl, inputEl, callback) {
+        if (!dropZoneEl) return;
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, () => dropZoneEl.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(evName => {
+            dropZoneEl.addEventListener(evName, () => dropZoneEl.classList.remove('dragover'), false);
+        });
+
+        dropZoneEl.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length > 0) {
+                callback(files);
+            }
+        });
+
+        if (inputEl) {
+            dropZoneEl.addEventListener('click', () => {
+                inputEl.click();
+            });
+
+            inputEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            inputEl.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    callback(e.target.files);
+                }
+            });
+        }
+    }
+
+    // Base64 decoding array helper
+    function base64ToUint8Array(base64String) {
+        const cleanB64 = base64String.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+        const binaryString = atob(cleanB64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    // Regex match highlight core builder
+    function highlightRegexMatches(patternStr, flags, text) {
+        if (!patternStr) return { html: escapeHtml(text), count: 0, list: [] };
+        try {
+            const regex = new RegExp(patternStr, flags);
+            const matches = [];
+            let match;
+            let lastIndex = -1;
+            
+            if (flags.includes('g')) {
+                while ((match = regex.exec(text)) !== null) {
+                    if (match.index === lastIndex) {
+                        regex.lastIndex++;
+                        continue;
+                    }
+                    lastIndex = match.index;
+                    matches.push({
+                        index: match.index,
+                        length: match[0].length,
+                        text: match[0],
+                        groups: match.slice(1)
+                    });
+                }
+            } else {
+                match = regex.exec(text);
+                if (match) {
+                    matches.push({
+                        index: match.index,
+                        length: match[0].length,
+                        text: match[0],
+                        groups: match.slice(1)
+                    });
+                }
+            }
+
+            if (matches.length === 0) {
+                return { html: escapeHtml(text), count: 0, list: [] };
+            }
+
+            let html = '';
+            let currentIndex = 0;
+            matches.forEach((m, i) => {
+                html += escapeHtml(text.substring(currentIndex, m.index));
+                const cls = i % 2 === 0 ? 'regex-match-mark' : 'regex-match-mark-even';
+                html += `<span class="${cls}">${escapeHtml(m.text)}</span>`;
+                currentIndex = m.index + m.length;
+            });
+            html += escapeHtml(text.substring(currentIndex));
+
+            return { html: html, count: matches.length, list: matches };
+        } catch (err) {
+            return { error: err.message };
+        }
+    }
+
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Main Developer Tools Initialization Function
+    let isDevToolsInitialized = false;
+    let devToolsClockInterval = null;
+
+    function initDevTools() {
+        if (isDevToolsInitialized) return;
+        isDevToolsInitialized = true;
+        
+        // Tab switching inside DevTools page
+        const devNavBtns = document.querySelectorAll('.dev-nav-btn');
+        const devToolContents = document.querySelectorAll('.dev-tool-content');
+        
+        devNavBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTool = btn.getAttribute('data-dev-tool');
+                
+                devNavBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                devToolContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `dev-tool-${targetTool}`) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+        
+        // ----------------------------------------------------
+        // Live Clock for Timestamp Converter
+        // ----------------------------------------------------
+        const liveEpochVal = document.getElementById('live-epoch-val');
+        const liveTimeLocal = document.getElementById('live-time-local');
+        const liveTimeUtc = document.getElementById('live-time-utc');
+        
+        if (devToolsClockInterval) clearInterval(devToolsClockInterval);
+        devToolsClockInterval = setInterval(() => {
+            const now = new Date();
+            const epoch = Math.floor(now.getTime() / 1000);
+            if (liveEpochVal) liveEpochVal.innerText = epoch;
+            if (liveTimeLocal) liveTimeLocal.innerText = now.toLocaleString();
+            if (liveTimeUtc) liveTimeUtc.innerText = now.toUTCString();
+        }, 1000);
+        
+        // Trigger clock once immediately
+        const now = new Date();
+        if (liveEpochVal) liveEpochVal.innerText = Math.floor(now.getTime() / 1000);
+        if (liveTimeLocal) liveTimeLocal.innerText = now.toLocaleString();
+        if (liveTimeUtc) liveTimeUtc.innerText = now.toUTCString();
+        
+        // ----------------------------------------------------
+        // JSON Formatter & Validator
+        // ----------------------------------------------------
+        const jsonInput = document.getElementById('json-input');
+        const jsonOutput = document.getElementById('json-output');
+        const jsonIndentSelect = document.getElementById('json-indent-select');
+        const btnJsonFormat = document.getElementById('btn-json-format');
+        const btnJsonMinify = document.getElementById('btn-json-minify');
+        const btnJsonValidate = document.getElementById('btn-json-validate');
+        const btnJsonSample = document.getElementById('btn-json-sample');
+        const btnJsonClear = document.getElementById('btn-json-clear');
+        const btnJsonCopy = document.getElementById('btn-json-copy');
+        const jsonStatusMsg = document.getElementById('json-status-msg');
+
+        function setJsonStatus(type, msg) {
+            if (!jsonStatusMsg) return;
+            jsonStatusMsg.className = `dev-status-banner dev-status-${type}`;
+            jsonStatusMsg.innerText = msg;
+            jsonStatusMsg.style.display = 'block';
+        }
+
+        function clearJsonStatus() {
+            if (jsonStatusMsg) jsonStatusMsg.style.display = 'none';
+        }
+
+        btnJsonSample.addEventListener('click', () => {
+            const sample = {
+                "name": "极客万能工具箱",
+                "version": "1.0.0",
+                "author": "Antigravity",
+                "description": "前端离线超级开发工具箱",
+                "features": [
+                    "视频压缩",
+                    "Markdown LaTeX 阅读器",
+                    "图片/音频格式转换",
+                    "PDF 处理",
+                    "开发者实用工具"
+                ],
+                "active": true,
+                "stats": {
+                    "stars": 128,
+                    "isOffline": true
+                }
+            };
+            jsonInput.value = JSON.stringify(sample, null, 4);
+            clearJsonStatus();
+            jsonOutput.innerText = "点击格式化/压缩按钮进行处理...";
+        });
+
+        btnJsonClear.addEventListener('click', () => {
+            jsonInput.value = '';
+            jsonOutput.innerText = 'JSON 格式化结果将在此处显示...';
+            clearJsonStatus();
+        });
+
+        btnJsonFormat.addEventListener('click', () => {
+            const val = jsonInput.value.trim();
+            if (!val) {
+                setJsonStatus('error', '请输入 JSON 字符串');
+                return;
+            }
+            try {
+                const parsed = JSON.parse(val);
+                const indent = jsonIndentSelect.value;
+                const space = indent === 'tab' ? '\t' : parseInt(indent);
+                const formatted = JSON.stringify(parsed, null, space);
+                jsonOutput.innerText = formatted;
+                
+                if (window.Prism) {
+                    Prism.highlightElement(jsonOutput);
+                }
+                setJsonStatus('success', '✓ JSON 格式正确，格式化成功！');
+            } catch (err) {
+                setJsonStatus('error', `JSON 语法错误: ${err.message}`);
+                jsonOutput.innerText = `解析失败，错误详情:\n${err.message}`;
+            }
+        });
+
+        btnJsonMinify.addEventListener('click', () => {
+            const val = jsonInput.value.trim();
+            if (!val) {
+                setJsonStatus('error', '请输入 JSON 字符串');
+                return;
+            }
+            try {
+                const parsed = JSON.parse(val);
+                const minified = JSON.stringify(parsed);
+                jsonOutput.innerText = minified;
+                
+                if (window.Prism) {
+                    Prism.highlightElement(jsonOutput);
+                }
+                setJsonStatus('success', '✓ JSON 格式正确，压缩成功！');
+            } catch (err) {
+                setJsonStatus('error', `JSON 语法错误: ${err.message}`);
+                jsonOutput.innerText = `解析失败，错误详情:\n${err.message}`;
+            }
+        });
+
+        btnJsonValidate.addEventListener('click', () => {
+            const val = jsonInput.value.trim();
+            if (!val) {
+                setJsonStatus('error', '请输入 JSON 字符串');
+                return;
+            }
+            try {
+                JSON.parse(val);
+                setJsonStatus('success', '✓ JSON 校验通过，格式完全正确！');
+            } catch (err) {
+                setJsonStatus('error', `JSON 语法错误: ${err.message}`);
+            }
+        });
+
+        btnJsonCopy.addEventListener('click', () => {
+            const outputText = jsonOutput.innerText;
+            if (outputText && outputText !== 'JSON 格式化结果将在此处显示...' && outputText !== '点击格式化/压缩按钮进行处理...') {
+                navigator.clipboard.writeText(outputText).then(() => {
+                    const originalText = btnJsonCopy.innerText;
+                    btnJsonCopy.innerText = '✓ 已复制';
+                    setTimeout(() => btnJsonCopy.innerText = originalText, 1500);
+                });
+            }
+        });
+
+        // ----------------------------------------------------
+        // Base64 / Transcoder
+        // ----------------------------------------------------
+        const transInput = document.getElementById('trans-input');
+        const transOutput = document.getElementById('trans-output');
+        const btnTransModeText = document.getElementById('btn-trans-mode-text');
+        const btnTransModeFile = document.getElementById('btn-trans-mode-file');
+        const transTextPanel = document.getElementById('trans-text-panel');
+        const transFilePanel = document.getElementById('trans-file-panel');
+        
+        btnTransModeText.addEventListener('click', () => {
+            btnTransModeText.classList.add('active');
+            btnTransModeFile.classList.remove('active');
+            transTextPanel.classList.add('active');
+            transFilePanel.classList.remove('active');
+        });
+        
+        btnTransModeFile.addEventListener('click', () => {
+            btnTransModeFile.classList.add('active');
+            btnTransModeText.classList.remove('active');
+            transFilePanel.classList.add('active');
+            transTextPanel.classList.remove('active');
+        });
+
+        function utoa(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+        function atou(str) {
+            return decodeURIComponent(escape(atob(str)));
+        }
+
+        function stringToHex(str) {
+            const encoder = new TextEncoder();
+            const view = encoder.encode(str);
+            return Array.from(view).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        function hexToString(hex) {
+            const cleanHex = hex.replace(/\s+/g, '');
+            const bytes = new Uint8Array(cleanHex.length / 2);
+            for (let i = 0; i < cleanHex.length; i += 2) {
+                bytes[i >> 1] = parseInt(cleanHex.substr(i, 2), 16);
+            }
+            const decoder = new TextDecoder();
+            return decoder.decode(bytes);
+        }
+
+        function unicodeEncode(str) {
+            return str.split('').map(c => {
+                const code = c.charCodeAt(0);
+                return code > 127 ? '\\u' + code.toString(16).padStart(4, '0') : c;
+            }).join('');
+        }
+        function unicodeDecode(str) {
+            return str.replace(/\\u([0-9a-fA-F]{4})/g, (match, grp) => {
+                return String.fromCharCode(parseInt(grp, 16));
+            });
+        }
+
+        document.getElementById('btn-trans-b64-enc').addEventListener('click', () => {
+            try { transOutput.value = utoa(transInput.value); } catch(err) { alert(err.message); }
+        });
+        document.getElementById('btn-trans-b64-dec').addEventListener('click', () => {
+            try { transOutput.value = atou(transInput.value.trim()); } catch(err) { alert('Base64 解密失败: 格式错误'); }
+        });
+        document.getElementById('btn-trans-url-enc').addEventListener('click', () => {
+            transOutput.value = encodeURIComponent(transInput.value);
+        });
+        document.getElementById('btn-trans-url-dec').addEventListener('click', () => {
+            try { transOutput.value = decodeURIComponent(transInput.value.trim()); } catch(err) { alert('URL 解码失败'); }
+        });
+        document.getElementById('btn-trans-hex-enc').addEventListener('click', () => {
+            transOutput.value = stringToHex(transInput.value);
+        });
+        document.getElementById('btn-trans-hex-dec').addEventListener('click', () => {
+            try { transOutput.value = hexToString(transInput.value.trim()); } catch(err) { alert('Hex 解码失败: 格式错误'); }
+        });
+        document.getElementById('btn-trans-uni-enc').addEventListener('click', () => {
+            transOutput.value = unicodeEncode(transInput.value);
+        });
+        document.getElementById('btn-trans-uni-dec').addEventListener('click', () => {
+            transOutput.value = unicodeDecode(transInput.value);
+        });
+        
+        document.getElementById('btn-trans-swap').addEventListener('click', () => {
+            const temp = transInput.value;
+            transInput.value = transOutput.value;
+            transOutput.value = temp;
+        });
+        
+        document.getElementById('btn-trans-copy').addEventListener('click', () => {
+            const val = transOutput.value;
+            if (val) {
+                navigator.clipboard.writeText(val).then(() => {
+                    const btn = document.getElementById('btn-trans-copy');
+                    const orig = btn.innerText;
+                    btn.innerText = '✓ 已复制';
+                    setTimeout(() => btn.innerText = orig, 1500);
+                });
+            }
+        });
+
+        // File Transcoder
+        const devFileInput = document.getElementById('dev-file-input');
+        const devFileDropZone = document.getElementById('dev-file-drop-zone');
+        const devFileMeta = document.getElementById('dev-file-meta');
+        const devFileName = document.getElementById('dev-file-name');
+        const devFileSize = document.getElementById('dev-file-size');
+        const devFileMime = document.getElementById('dev-file-mime');
+        const devFilePreviewContainer = document.getElementById('dev-file-preview-container');
+        const devFilePreviewImg = document.getElementById('dev-file-preview-img');
+        const devFileB64Output = document.getElementById('dev-file-b64-output');
+        
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function handleDevFile(file) {
+            if (!file) return;
+            devFileName.innerText = file.name;
+            devFileSize.innerText = formatBytes(file.size);
+            devFileMime.innerText = file.type || 'unknown';
+            devFileMeta.style.display = 'flex';
+            
+            document.getElementById('dev-decode-filename').value = 'decoded_' + file.name;
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    devFilePreviewImg.src = e.target.result;
+                    devFilePreviewContainer.style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                devFilePreviewContainer.style.display = 'none';
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                devFileB64Output.value = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        setupDevDragDrop(devFileDropZone, devFileInput, (files) => {
+            if (files && files.length > 0) {
+                handleDevFile(files[0]);
+            }
+        });
+
+        document.getElementById('btn-copy-raw-b64').addEventListener('click', () => {
+            const raw = devFileB64Output.value.replace(/^data:[^;]+;base64,/, '');
+            if (raw) {
+                navigator.clipboard.writeText(raw).then(() => {
+                    const btn = document.getElementById('btn-copy-raw-b64');
+                    btn.innerText = '✓ 已复制';
+                    setTimeout(() => btn.innerText = '复制 Raw', 1500);
+                });
+            }
+        });
+
+        document.getElementById('btn-copy-data-url').addEventListener('click', () => {
+            const dataUrl = devFileB64Output.value;
+            if (dataUrl) {
+                navigator.clipboard.writeText(dataUrl).then(() => {
+                    const btn = document.getElementById('btn-copy-data-url');
+                    btn.innerText = '✓ 已复制';
+                    setTimeout(() => btn.innerText = '复制 Data URL', 1500);
+                });
+            }
+        });
+
+        const devFileB64Input = document.getElementById('dev-file-b64-input');
+        const devDecodeFilename = document.getElementById('dev-decode-filename');
+        const btnDevB64Download = document.getElementById('btn-dev-b64-download');
+
+        btnDevB64Download.addEventListener('click', () => {
+            const b64 = devFileB64Input.value.trim();
+            if (!b64) {
+                alert('请先贴入 Base64 编码');
+                return;
+            }
+            let filename = devDecodeFilename.value.trim();
+            if (!filename) {
+                filename = 'decoded_file.bin';
+            }
+
+            try {
+                let mime = 'application/octet-stream';
+                const mimeMatch = b64.match(/^data:([^;]+);base64,/);
+                if (mimeMatch) {
+                    mime = mimeMatch[1];
+                }
+
+                const bytes = base64ToUint8Array(b64);
+                const blob = new Blob([bytes], { type: mime });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('解码失败: Base64 格式无效 (' + err.message + ')');
+            }
+        });
+
+        // ----------------------------------------------------
+        // Hash Generator
+        // ----------------------------------------------------
+        const btnHashModeText = document.getElementById('btn-hash-mode-text');
+        const btnHashModeFile = document.getElementById('btn-hash-mode-file');
+        const hashTextPanel = document.getElementById('hash-text-panel');
+        const hashFilePanel = document.getElementById('hash-file-panel');
+        
+        btnHashModeText.addEventListener('click', () => {
+            btnHashModeText.classList.add('active');
+            btnHashModeFile.classList.remove('active');
+            hashTextPanel.classList.add('active');
+            hashFilePanel.classList.remove('active');
+        });
+        
+        btnHashModeFile.addEventListener('click', () => {
+            btnHashModeFile.classList.add('active');
+            btnHashModeText.classList.remove('active');
+            hashFilePanel.classList.add('active');
+            hashTextPanel.classList.remove('active');
+        });
+
+        const hashEnableHmac = document.getElementById('hash-enable-hmac');
+        const hashHmacKeyWrapper = document.getElementById('hash-hmac-key-wrapper');
+        const hashHmacKey = document.getElementById('hash-hmac-key');
+        
+        hashEnableHmac.addEventListener('change', () => {
+            if (hashEnableHmac.checked) {
+                hashHmacKeyWrapper.style.display = 'block';
+            } else {
+                hashHmacKeyWrapper.style.display = 'none';
+            }
+            triggerTextHash();
+        });
+
+        const hashTextInput = document.getElementById('hash-text-input');
+        
+        hashTextInput.addEventListener('input', triggerTextHash);
+        hashHmacKey.addEventListener('input', triggerTextHash);
+
+        async function cryptoHash(text, algo) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest(algo, data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function cryptoHmac(text, keyString, algo) {
+            const encoder = new TextEncoder();
+            const keyData = encoder.encode(keyString);
+            const messageData = encoder.encode(text);
+            const cryptoKey = await crypto.subtle.importKey(
+                'raw', 
+                keyData, 
+                { name: 'HMAC', hash: algo }, 
+                false, 
+                ['sign']
+            );
+            const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+            const hashArray = Array.from(new Uint8Array(signature));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function triggerTextHash() {
+            const text = hashTextInput.value;
+            const hmacEnabled = hashEnableHmac.checked;
+            const key = hashHmacKey.value;
+
+            const outMd5 = document.getElementById('hash-out-md5');
+            const outSha1 = document.getElementById('hash-out-sha1');
+            const outSha256 = document.getElementById('hash-out-sha256');
+            const outSha512 = document.getElementById('hash-out-sha512');
+
+            if (!text) {
+                outMd5.value = '';
+                outSha1.value = '';
+                outSha256.value = '';
+                outSha512.value = '';
+                return;
+            }
+
+            try {
+                if (hmacEnabled) {
+                    outMd5.value = hmacMd5(text, key);
+                    outSha1.value = await cryptoHmac(text, key, 'SHA-1');
+                    outSha256.value = await cryptoHmac(text, key, 'SHA-256');
+                    outSha512.value = await cryptoHmac(text, key, 'SHA-512');
+                } else {
+                    outMd5.value = md5(text);
+                    outSha1.value = await cryptoHash(text, 'SHA-1');
+                    outSha256.value = await cryptoHash(text, 'SHA-256');
+                    outSha512.value = await cryptoHash(text, 'SHA-512');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        const hashCopyBtns = document.querySelectorAll('.btn-hash-copy');
+        hashCopyBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target-input');
+                const input = document.getElementById(targetId);
+                if (input && input.value) {
+                    navigator.clipboard.writeText(input.value).then(() => {
+                        const orig = btn.innerText;
+                        btn.innerText = '已复制';
+                        setTimeout(() => btn.innerText = orig, 1500);
+                    });
+                }
+            });
+        });
+
+        // File Hash
+        const devHashFileInput = document.getElementById('dev-hash-file-input');
+        const devHashFileDropZone = document.getElementById('dev-hash-file-drop-zone');
+        const devFileHashResults = document.getElementById('dev-file-hash-results');
+        
+        const hashFileNameVal = document.getElementById('hash-file-name-val');
+        const hashFileSizeVal = document.getElementById('hash-file-size-val');
+        
+        const hashFileMd5 = document.getElementById('hash-file-md5');
+        const hashFileSha1 = document.getElementById('hash-file-sha1');
+        const hashFileSha256 = document.getElementById('hash-file-sha256');
+
+        setupDevDragDrop(devHashFileDropZone, devHashFileInput, (files) => {
+            if (files && files.length > 0) {
+                handleHashFile(files[0]);
+            }
+        });
+
+        async function handleHashFile(file) {
+            if (!file) return;
+            
+            hashFileNameVal.innerText = file.name;
+            hashFileSizeVal.innerText = formatBytes(file.size);
+            devFileHashResults.style.display = 'flex';
+
+            hashFileMd5.value = '计算中...';
+            hashFileSha1.value = '计算中...';
+            hashFileSha256.value = '计算中...';
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const arrayBuffer = e.target.result;
+                
+                try {
+                    hashFileMd5.value = md5(arrayBuffer);
+                } catch(err) {
+                    hashFileMd5.value = 'MD5 计算出错';
+                }
+
+                try {
+                    const sha1Buffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
+                    hashFileSha1.value = Array.from(new Uint8Array(sha1Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch(err) {
+                    hashFileSha1.value = 'SHA-1 计算出错';
+                }
+
+                try {
+                    const sha256Buffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+                    hashFileSha256.value = Array.from(new Uint8Array(sha256Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch(err) {
+                    hashFileSha256.value = 'SHA-256 计算出错';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ----------------------------------------------------
+        // Timestamp Converter
+        // ----------------------------------------------------
+        const epochInputVal = document.getElementById('epoch-input-val');
+        const epochUnitSelect = document.getElementById('epoch-unit-select');
+        const btnEpochToDate = document.getElementById('btn-epoch-to-date');
+        
+        const epochOutLocal = document.getElementById('epoch-out-local');
+        const epochOutUtc = document.getElementById('epoch-out-utc');
+        const epochOutIso = document.getElementById('epoch-out-iso');
+        
+        const dateInputVal = document.getElementById('date-input-val');
+        const btnDateToEpoch = document.getElementById('btn-date-to-epoch');
+        const btnDateNow = document.getElementById('btn-date-now');
+        
+        const dateOutSec = document.getElementById('date-out-sec');
+        const dateOutMs = document.getElementById('date-out-ms');
+
+        const currentSeconds = Math.floor(Date.now() / 1000);
+        epochInputVal.value = currentSeconds;
+        
+        function formatDateTimeLocal(date) {
+            const tzoffset = date.getTimezoneOffset() * 60000;
+            const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, -1);
+            return localISOTime.substring(0, 16);
+        }
+        dateInputVal.value = formatDateTimeLocal(new Date());
+
+        btnEpochToDate.addEventListener('click', () => {
+            const val = parseInt(epochInputVal.value);
+            if (isNaN(val)) {
+                alert('请输入有效的时间戳');
+                return;
+            }
+            const unit = epochUnitSelect.value;
+            const ms = unit === 's' ? val * 1000 : val;
+            const date = new Date(ms);
+            
+            epochOutLocal.innerText = date.toLocaleString();
+            epochOutUtc.innerText = date.toUTCString();
+            epochOutIso.innerText = date.toISOString();
+        });
+
+        btnEpochToDate.click();
+
+        btnDateToEpoch.addEventListener('click', () => {
+            const dateStr = dateInputVal.value;
+            if (!dateStr) {
+                alert('请选择日期和时间');
+                return;
+            }
+            const date = new Date(dateStr);
+            const ms = date.getTime();
+            if (isNaN(ms)) {
+                alert('日期时间格式无效');
+                return;
+            }
+            dateOutSec.innerText = Math.floor(ms / 1000);
+            dateOutMs.innerText = ms;
+        });
+
+        btnDateToEpoch.click();
+
+        btnDateNow.addEventListener('click', () => {
+            const dNow = new Date();
+            dateInputVal.value = formatDateTimeLocal(dNow);
+            btnDateToEpoch.click();
+        });
+
+        function wireCopyLabel(btnId, valSourceEl, isInput = false) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const text = isInput ? valSourceEl.value : valSourceEl.innerText;
+                if (text && text !== '-') {
+                    navigator.clipboard.writeText(text).then(() => {
+                        const orig = btn.innerText;
+                        btn.innerText = '已复制';
+                        setTimeout(() => btn.innerText = orig, 1500);
+                    });
+                }
+            });
+        }
+        wireCopyLabel('btn-copy-epoch-local', epochOutLocal);
+        wireCopyLabel('btn-copy-epoch-utc', epochOutUtc);
+        wireCopyLabel('btn-copy-epoch-iso', epochOutIso);
+        wireCopyLabel('btn-copy-date-sec', dateOutSec);
+        wireCopyLabel('btn-copy-date-ms', dateOutMs);
+
+        // ----------------------------------------------------
+        // Regex Tester
+        // ----------------------------------------------------
+        const regexPattern = document.getElementById('regex-pattern');
+        const regexFlagG = document.getElementById('regex-flag-g');
+        const regexFlagI = document.getElementById('regex-flag-i');
+        const regexFlagM = document.getElementById('regex-flag-m');
+        const regexText = document.getElementById('regex-text');
+        const regexHighlightOutput = document.getElementById('regex-highlight-output');
+        const regexMatchCount = document.getElementById('regex-match-count');
+        const regexDetailsTable = document.getElementById('regex-details-table').querySelector('tbody');
+        const btnRegexSample = document.getElementById('btn-regex-sample');
+
+        function triggerRegex() {
+            const pattern = regexPattern.value;
+            const text = regexText.value;
+
+            if (!pattern) {
+                regexHighlightOutput.innerText = text || '匹配结果将在此高亮显示...';
+                regexMatchCount.innerText = '找到 0 处匹配';
+                regexMatchCount.className = 'config-indicator';
+                regexDetailsTable.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 12px;">暂无匹配详情</td></tr>`;
+                return;
+            }
+
+            let flags = '';
+            if (regexFlagG.checked) flags += 'g';
+            if (regexFlagI.checked) flags += 'i';
+            if (regexFlagM.checked) flags += 'm';
+
+            const result = highlightRegexMatches(pattern, flags, text);
+
+            if (result.error) {
+                regexHighlightOutput.innerHTML = `<span style="color: #F87171;">正则表达式语法错误: ${escapeHtml(result.error)}</span>`;
+                regexMatchCount.innerText = '正则错误';
+                regexMatchCount.className = 'config-indicator status-loading';
+                regexDetailsTable.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #F87171; padding: 12px;">语法错误: ${escapeHtml(result.error)}</td></tr>`;
+                return;
+            }
+
+            regexHighlightOutput.innerHTML = result.html;
+            regexMatchCount.innerText = `找到 ${result.count} 处匹配`;
+            regexMatchCount.className = 'config-indicator';
+
+            if (result.list.length === 0) {
+                regexDetailsTable.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 12px;">暂无匹配项</td></tr>`;
+                return;
+            }
+
+            let rowsHtml = '';
+            result.list.forEach((m, idx) => {
+                const groupDetails = m.groups && m.groups.length > 0
+                    ? m.groups.map((g, i) => `$${i+1}: "${escapeHtml(g || '')}"`).join('<br>')
+                    : '<span style="color: var(--text-dark);">-</span>';
+                rowsHtml += `
+                    <tr>
+                        <td style="font-weight: 500; color: var(--primary-light);">#${idx + 1}</td>
+                        <td style="font-family: monospace;">[${m.index}, ${m.index + m.length}]</td>
+                        <td style="font-family: monospace; white-space: pre-wrap; word-break: break-all;">${escapeHtml(m.text)}</td>
+                        <td style="font-size: 11px; line-height: 1.4; color: var(--text-muted); font-family: monospace;">${groupDetails}</td>
+                    </tr>
+                `;
+            });
+            regexDetailsTable.innerHTML = rowsHtml;
+        }
+
+        regexPattern.addEventListener('input', triggerRegex);
+        regexText.addEventListener('input', triggerRegex);
+        [regexFlagG, regexFlagI, regexFlagM].forEach(chk => chk.addEventListener('change', triggerRegex));
+
+        btnRegexSample.addEventListener('click', () => {
+            regexPattern.value = '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}';
+            regexFlagG.checked = true;
+            regexFlagI.checked = true;
+            regexText.value = '我的工作邮箱是 admin@geektoolbox.local，测试邮箱是 test.user_123@gmail.com.cn。\n如果你有任何疑问，也可以联系 support@omnitoolbox.org，谢谢！';
+            triggerRegex();
+        });
+
+        // ----------------------------------------------------
+        // JWT Debugger
+        // ----------------------------------------------------
+        const jwtTokenInput = document.getElementById('jwt-token-input');
+        const jwtHeaderOutput = document.getElementById('jwt-header-output');
+        const jwtPayloadOutput = document.getElementById('jwt-payload-output');
+        const jwtStatusBlock = document.getElementById('jwt-status-block');
+        const btnJwtSample = document.getElementById('btn-jwt-sample');
+
+        function triggerJwtDecode() {
+            const token = jwtTokenInput.value.trim();
+            
+            if (!token) {
+                jwtHeaderOutput.innerText = '-';
+                jwtPayloadOutput.innerText = '-';
+                jwtStatusBlock.style.display = 'none';
+                return;
+            }
+
+            const parts = token.split('.');
+            if (parts.length < 2 || parts.length > 3) {
+                jwtHeaderOutput.innerText = '错误: 无效的 JWT 格式 (必须包含由 \'.\' 分隔的 3 部分)';
+                jwtPayloadOutput.innerText = '-';
+                jwtStatusBlock.className = 'dev-status-banner dev-status-error';
+                jwtStatusBlock.innerText = '⚠️ Token 格式不正确，解析失败！';
+                jwtStatusBlock.style.display = 'block';
+                return;
+            }
+
+            try {
+                const decodedHeader = base64UrlDecode(parts[0]);
+                const headerObj = JSON.parse(decodedHeader);
+                jwtHeaderOutput.innerText = JSON.stringify(headerObj, null, 4);
+                if (window.Prism) Prism.highlightElement(jwtHeaderOutput);
+
+                const decodedPayload = base64UrlDecode(parts[1]);
+                const payloadObj = JSON.parse(decodedPayload);
+                jwtPayloadOutput.innerText = JSON.stringify(payloadObj, null, 4);
+                if (window.Prism) Prism.highlightElement(jwtPayloadOutput);
+
+                if (payloadObj.exp) {
+                    const expTimeMs = payloadObj.exp * 1000;
+                    const expDate = new Date(expTimeMs);
+                    const nowMs = Date.now();
+                    const secondsDiff = Math.abs(Math.floor((expTimeMs - nowMs) / 1000));
+                    
+                    let timeDiffStr = '';
+                    if (secondsDiff < 60) {
+                        timeDiffStr = `${secondsDiff} 秒`;
+                    } else if (secondsDiff < 3600) {
+                        timeDiffStr = `${Math.floor(secondsDiff / 60)} 分钟`;
+                    } else if (secondsDiff < 3600 * 24) {
+                        timeDiffStr = `${Math.floor(secondsDiff / 3600)} 小时`;
+                    } else {
+                        timeDiffStr = `${Math.floor(secondsDiff / 86400)} 天`;
+                    }
+
+                    if (expTimeMs > nowMs) {
+                        jwtStatusBlock.className = 'dev-status-banner dev-status-success';
+                        jwtStatusBlock.innerText = `🔑 Token 有效 | 过期时间: ${expDate.toLocaleString()} (距离过期还有 ${timeDiffStr})`;
+                    } else {
+                        jwtStatusBlock.className = 'dev-status-banner dev-status-error';
+                        jwtStatusBlock.innerText = `⚠️ Token 已过期 | 过期时间: ${expDate.toLocaleString()} (已过期 ${timeDiffStr})`;
+                    }
+                    jwtStatusBlock.style.display = 'block';
+                } else {
+                    jwtStatusBlock.className = 'dev-status-banner dev-status-success';
+                    jwtStatusBlock.innerText = `🔑 Token 解析成功 (未检测到 exp 过期期限声明)`;
+                    jwtStatusBlock.style.display = 'block';
+                }
+            } catch (err) {
+                jwtHeaderOutput.innerText = `解析失败: ${err.message}`;
+                jwtPayloadOutput.innerText = '-';
+                jwtStatusBlock.className = 'dev-status-banner dev-status-error';
+                jwtStatusBlock.innerText = `⚠️ Base64Url / JSON 解码出错: ${err.message}`;
+                jwtStatusBlock.style.display = 'block';
+            }
+        }
+
+        jwtTokenInput.addEventListener('input', triggerJwtDecode);
+
+        btnJwtSample.addEventListener('click', () => {
+            const header = { "alg": "HS256", "typ": "JWT" };
+            const expSec = Math.floor(Date.now() / 1000) + 3600;
+            const payload = {
+                "sub": "1234567890",
+                "name": "Geek Dev",
+                "role": "Administrator",
+                "iat": Math.floor(Date.now() / 1000),
+                "exp": expSec
+            };
+            
+            function b64url(obj) {
+                const json = JSON.stringify(obj);
+                const b64 = btoa(unescape(encodeURIComponent(json)));
+                return b64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+            }
+
+            const token = `${b64url(header)}.${b64url(payload)}.SignaturePlaceholderHere_geektoolbox`;
+            jwtTokenInput.value = token;
+            triggerJwtDecode();
+        });
+    }
+
+    // Collapsible Workspace Card Event Listeners (Event Delegation)
+    document.addEventListener('click', (e) => {
+        const header = e.target.closest('.workspace-card.collapsible .card-header');
+        if (!header) return;
+        
+        // Don't toggle collapse if clicking on an interactive element (e.g. "追加文件" button)
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) {
+            return;
+        }
+        
+        const card = header.closest('.workspace-card.collapsible');
+        if (card) {
+            card.classList.toggle('collapsed');
+        }
+    });
+});
