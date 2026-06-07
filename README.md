@@ -63,6 +63,14 @@ Everyday utilities for developers.
 - Color Picker & Converter
 - UUID Generator
 
+### 🚀 P2P File Transfer
+End-to-end client-side file sharing utilizing WebRTC P2P direct transmission.
+- 100% serverless data channel; files never touch any middleman servers
+- Direct drag-and-drop file upload with multiple file selection support
+- In-app QR code pairing utilizing camera streams and offline URL hash routing
+- Flow control with WebRTC backpressure safety to support files of arbitrary size
+- Real-time transfer statistics including elapsed duration, speeds, and ETA readouts
+
 ---
 
 ## Privacy
@@ -83,6 +91,7 @@ All processing happens locally in the browser via WebAssembly. OmniTools has no 
 | Markdown parsing | [marked.js](https://marked.js.org/) |
 | Cross-origin isolation | [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) |
 | UI | Vanilla HTML / CSS / JavaScript |
+| P2P File Transfer | [PeerJS](https://peerjs.com/) + [jsQR](https://github.com/cozmo/jsQR) + [QRious](https://github.com/neocotic/qrious) |
 
 ---
 
