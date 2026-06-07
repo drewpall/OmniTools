@@ -211,7 +211,7 @@ body::after {
     line-height: 1.2;
 }
 
-.brand-text span {
+.brand-text > span {
     font-size: 11px;
     color: var(--text-muted);
     font-weight: 500;
@@ -3574,6 +3574,70 @@ body.light-theme .workspace-card.collapsible .card-header:hover {
         top: 0%;
     }
 }
+
+/* P2P Status Badge Styles */
+.badge-p2p-waiting {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+body.light-theme .badge-p2p-waiting {
+    background-color: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--text-secondary);
+}
+
+.badge-p2p-running {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #60A5FA;
+}
+body.light-theme .badge-p2p-running {
+    background-color: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: #2563EB;
+}
+
+.badge-p2p-completed {
+    background-color: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #34D399;
+}
+body.light-theme .badge-p2p-completed {
+    background-color: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #059669;
+}
+
+.badge-p2p-failed {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #F87171;
+}
+body.light-theme .badge-p2p-failed {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #DC2626;
+}
+
+/* Multi-language translation show/hide rules */
+body:not(.lang-en) .lang-en {
+    display: none !important;
+}
+body.lang-en .lang-zh {
+    display: none !important;
+}
+
+/* Language switcher button custom typography */
+#language-toggle-btn {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 
 
 

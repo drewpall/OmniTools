@@ -71,6 +71,11 @@ End-to-end client-side file sharing utilizing WebRTC P2P direct transmission.
 - Flow control with WebRTC backpressure safety to support files of arbitrary size
 - Real-time transfer statistics including elapsed duration, speeds, and ETA readouts
 
+### 🌐 Bilingual UI (English / Chinese)
+Switch the entire interface between English and Simplified Chinese with a single click.
+- Language preference is persisted in `localStorage` across sessions
+- All tool labels, buttons, status messages, and tooltips are fully localized
+
 ---
 
 ## Privacy
