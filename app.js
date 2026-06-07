@@ -236,6 +236,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 toolTitle.innerText = "开发者实用工具";
                 toolDesc.innerText = "常用开发工具箱，100% 本地离线处理，防泄密";
                 initDevTools();
+            } else if (target === 'file-transfer') {
+                document.getElementById('file-transfer-page').classList.add('active');
+                toolTitle.innerText = "P2P 文件闪传";
+                toolDesc.innerText = "端到端极速直传，不限大小，不经服务器，安全隐私";
+                if (window.initFileTransfer) {
+                    window.initFileTransfer();
+                }
             } else {
                 // video-compressor
                 document.getElementById('video-compressor-page').classList.add('active');
@@ -249,6 +256,16 @@ document.addEventListener('DOMContentLoaded', () => {
     btnGoBackVideo.addEventListener('click', () => {
         document.querySelector('[data-target="video-compressor"]').click();
     });
+
+    // Initial routing check for file-transfer on page load
+    if (window.location.hash.startsWith('#file-transfer')) {
+        const transferNavItem = document.querySelector('.nav-item[data-target="file-transfer"]');
+        if (transferNavItem) {
+            setTimeout(() => {
+                transferNavItem.click();
+            }, 100);
+        }
+    }
 
     /* ==========================================================================
        2. MARKDOWN + LATEX READER LOGIC

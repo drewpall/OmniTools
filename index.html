@@ -34,8 +34,17 @@
     <!-- JSZip for dynamic ZIP package creation -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
+    <!-- PeerJS for WebRTC P2P File Transfer -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- QRious for local QR code generation -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <!-- jsQR for in-app QR code scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
     <!-- Main Application Logic -->
-    <script src="app.js" defer></script>
+    <script src="app.js?v=1.0.2" defer></script>
+    <!-- P2P File Transfer Logic -->
+    <script src="file-transfer.js?v=1.0.2" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -75,6 +84,10 @@
                 <a href="#" class="nav-item" data-target="developer-tools">
                     <span class="nav-icon">🛠️</span>
                     <span class="nav-label">开发者实用工具</span>
+                </a>
+                <a href="#" class="nav-item" data-target="file-transfer">
+                    <span class="nav-icon">🚀</span>
+                    <span class="nav-label">P2P 文件闪传</span>
                 </a>
             </nav>
         </aside>
@@ -1885,6 +1898,131 @@
                                 </div>
                             </div>
 
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tool Page 7: P2P File Transfer -->
+                <div id="file-transfer-page" class="tool-page">
+                    <!-- Pairing & Status Section -->
+                    <div id="p2p-pairing-panel" class="control-panel-grid">
+                        <!-- Left Panel: My Status & QR -->
+                        <div class="workspace-card details-card">
+                            <div class="card-header">
+                                <h3>📱 我的设备状态</h3>
+                            </div>
+                            <div class="p2p-device-info">
+                                <div class="p2p-status-indicator">
+                                    <span class="status-dot status-loading" id="p2p-my-status-dot"></span>
+                                    <span id="p2p-my-status-text">正在初始化 P2P 服务...</span>
+                                </div>
+                                <div class="config-group" style="margin-top: 16px;">
+                                    <label class="config-title">我的设备 ID</label>
+                                    <div class="p2p-id-wrapper">
+                                        <input type="text" id="p2p-my-id" class="select-control" readonly placeholder="获取中...">
+                                        <button id="p2p-btn-copy-id" class="btn btn-secondary btn-sm" disabled>复制 ID</button>
+                                    </div>
+                                </div>
+                                <div class="p2p-qr-wrapper" style="margin-top: 20px; text-align: center;">
+                                    <div class="p2p-qr-box" style="display: inline-block; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                        <canvas id="p2p-qr-canvas" width="150" height="150"></canvas>
+                                    </div>
+                                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">用另一台设备扫描此二维码即可自动完成配对连接</p>
+                                    <button id="p2p-btn-copy-link" class="btn btn-secondary btn-sm" style="margin-top: 8px;" disabled>复制配对连接</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Connect to Peer -->
+                        <div class="workspace-card config-card" style="display: flex; flex-direction: column; gap: 24px;">
+                            <div class="card-header">
+                                <h3>🔌 连接到其他设备</h3>
+                            </div>
+                            <div class="config-section" style="margin-bottom: 0;">
+                                <div class="config-group">
+                                    <label class="config-title">输入对方设备的 ID</label>
+                                    <input type="text" id="p2p-target-id" class="select-control" placeholder="在此粘贴对方的设备 ID..." style="font-family: monospace; font-size: 15px; letter-spacing: 0.5px;">
+                                </div>
+                                <div class="config-actions" style="margin-top: 20px; display: flex; gap: 12px;">
+                                    <button id="p2p-btn-connect" class="btn btn-primary btn-large glow-btn" style="flex-grow: 1; min-height: 50px;">
+                                        <span class="btn-text">⚡ 建立安全连接</span>
+                                    </button>
+                                    <button id="p2p-btn-start-scan" class="btn btn-secondary" style="min-height: 50px; display: flex; align-items: center; justify-content: center; gap: 8px;" title="扫描对方设备的二维码进行配对">
+                                        <span>📸 扫码连接</span>
+                                    </button>
+                                </div>
+                                <div id="p2p-scanner-wrapper" style="display: none; margin-top: 16px; position: relative; overflow: hidden; border-radius: 8px; border: 1px solid var(--border-color); background: #000;">
+                                    <canvas id="p2p-scanner-canvas" style="width: 100%; height: 240px; display: block; object-fit: cover;"></canvas>
+                                    <div class="scanner-laser"></div>
+                                    <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; pointer-events: none;">
+                                        🔍 请将对方的二维码对准相机中心
+                                    </div>
+                                    <button id="p2p-btn-cancel-scan" class="btn btn-secondary btn-xs" style="position: absolute; bottom: 10px; right: 10px; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+                                        <span>取消</span>
+                                    </button>
+                                </div>
+                                <div class="p2p-help-tips" style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 8px;">
+                                    <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">💡 使用指引：</h4>
+                                    <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; line-height: 1.6; display: flex; flex-direction: column; gap: 6px;">
+                                        <li>本工具基于 <strong>WebRTC</strong> 技术，文件数据直接在两台设备之间点对点传输，<strong>绝不经过任何服务器</strong>。</li>
+                                        <li>如果两台设备在同一 WiFi 下，传输速度可达局域网最大带宽，完全不耗费公网流量。</li>
+                                        <li>如果跨网传输（如一台连 WiFi，一台用 5G），速度取决于发送端的网络上传速度。</li>
+                                        <li>请保持此页面打开，不要刷新或关闭，否则连接将会中断。</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Connection Panel (Hidden by default) -->
+                    <div id="p2p-active-panel" style="display: none; flex-direction: column; gap: 24px;">
+                        <!-- Connection Status bar -->
+                        <div class="workspace-card" style="padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span class="status-dot status-success" style="width: 12px; height: 12px; animation: pulse 2s infinite;"></span>
+                                <div>
+                                    <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary);">已成功连接到远程设备</h3>
+                                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">设备标识: <span id="p2p-connected-peer-id" style="font-family: monospace; font-weight: 500; color: var(--primary-light);"></span></p>
+                                </div>
+                            </div>
+                            <button id="p2p-btn-disconnect" class="btn btn-secondary btn-sm" style="border-color: #EF4444; color: #EF4444;">
+                                <span>断开连接</span>
+                            </button>
+                        </div>
+
+                        <!-- Main workspace card: send and receive -->
+                        <div class="control-panel-grid">
+                            <!-- Left: File Drop Zone -->
+                            <div class="workspace-card upload-card" style="height: 100%; min-height: 320px;">
+                                <div class="upload-zone" id="p2p-drop-zone">
+                                    <input type="file" id="p2p-file-input" multiple style="display: none;">
+                                    <div class="upload-illustration">
+                                        <div class="pulse-circle" style="background: rgba(139, 92, 246, 0.1);">
+                                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--primary-light)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="upload-arrow"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
+                                        </div>
+                                    </div>
+                                    <div class="upload-text">
+                                        <h3>拖入您要发送的文件 或 <span class="text-highlight">点击浏览</span></h3>
+                                        <p class="support-info">支持任意格式、任意大小的文件。支持同时选择多个文件。</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Transfer Queue / Progress Panel -->
+                            <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 16px; min-height: 320px;">
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h3>📁 传输任务列表</h3>
+                                    <button id="p2p-btn-clear-history" class="btn btn-secondary btn-xs" style="font-size: 11px;">清空记录</button>
+                                </div>
+                                <div id="p2p-empty-queue-tip" style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; padding: 24px 0;">
+                                    <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">📤</div>
+                                    <p style="font-size: 13px;">暂无传输任务</p>
+                                    <p style="font-size: 11px; margin-top: 4px; max-width: 200px;">在左侧选择文件开始发送，或等待对方给您发送文件</p>
+                                </div>
+                                <div id="p2p-queue-list" style="display: none; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                                    <!-- Transfer Items will go here dynamically -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
