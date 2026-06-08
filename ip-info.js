@@ -37,6 +37,27 @@
         }
     }
 
+    // Promise.any compatible race function
+    async function racePromises(promises) {
+        if (window.Promise && Promise.any) {
+            return Promise.any(promises);
+        }
+        // Simple Promise.any fallback polyfill
+        return new Promise((resolve, reject) => {
+            let errors = [];
+            let remaining = promises.length;
+            promises.forEach(p => {
+                Promise.resolve(p).then(resolve, err => {
+                    errors.push(err);
+                    remaining--;
+                    if (remaining === 0) {
+                        reject(new AggregateError(errors, 'All promises failed'));
+                    }
+                });
+            });
+        });
+    }
+
     // Initializer
     window.initIpInfo = async function() {
         if (isInitialized) {
@@ -145,7 +166,7 @@
         runIpLookup(input);
     }
 
-    // Geolocation details resolver chain (with timeouts & fallback providers)
+    // Geolocation details resolver chain (with GFW timeouts & fallback providers)
     async function runIpLookup(ip) {
         const loadingStr = t('正在加载...', 'Loading...');
         $('ip-info-country').textContent = loadingStr;
@@ -200,15 +221,15 @@
                 isp: d.isp,
                 org: d.organization,
                 asn: `AS${d.asn}`,
-                proxy: null, // to be populated by blackbox
+                proxy: null,
                 hosting: null,
                 mobile: null
             })
         });
 
-        // Backup HTTPS GeoIP provider: ipapi.co
+        // Backup HTTPS GeoIP provider: ipapi.co (Fixed: correct url formatting for empty ip queries)
         endpoints.push({
-            url: `https://ipapi.co/${ip || 'json'}/json/`,
+            url: ip ? `https://ipapi.co/${ip}/json/` : 'https://ipapi.co/json/',
             parse: (d) => ({
                 ip: d.ip,
                 country: d.country_name,
@@ -227,6 +248,30 @@
             })
         });
 
+        // Third HTTPS fallback: ipinfo.io (extremely stable, rarely blocked by adblockers)
+        endpoints.push({
+            url: ip ? `https://ipinfo.io/${ip}/json` : 'https://ipinfo.io/json',
+            parse: (d) => {
+                const [lat, lon] = (d.loc || '0,0').split(',').map(Number);
+                return {
+                    ip: d.ip,
+                    country: d.country,
+                    countryCode: d.country,
+                    region: d.region,
+                    city: d.city,
+                    zip: d.postal,
+                    lat: lat,
+                    lon: lon,
+                    isp: d.org || '-',
+                    org: d.org || '-',
+                    asn: d.org ? d.org.split(' ')[0] : '',
+                    proxy: null,
+                    hosting: null,
+                    mobile: null
+                };
+            }
+        });
+
         let data = null;
         for (const provider of endpoints) {
             try {
@@ -242,8 +287,26 @@
         }
 
         if (!data) {
-            // All providers failed
-            $('ip-info-country').textContent = t('⚠️ 加载超时，请重试', '⚠️ Timeout, please retry');
+            // All providers failed (Timeout / Offline state)
+            const errorStr = t('⚠️ 加载超时，请重试', '⚠️ Timeout, please retry');
+            $('ip-info-country').textContent = errorStr;
+            $('ip-info-region').textContent = '-';
+            $('ip-info-city').textContent = '-';
+            $('ip-info-zip').textContent = '-';
+            $('ip-info-coordinates').textContent = '-';
+            $('ip-info-isp').textContent = '-';
+            $('ip-info-org').textContent = '-';
+            $('ip-info-asn').textContent = '-';
+            $('ip-info-range').textContent = '-';
+
+            const badge = $('ip-purity-score-badge');
+            badge.textContent = 'N/A';
+            badge.className = 'preview-badge badge-warning';
+
+            $('ip-purity-proxy').textContent = t('无法检测', 'Error');
+            $('ip-purity-hosting').textContent = t('无法检测', 'Error');
+            $('ip-purity-mobile').textContent = t('无法检测', 'Error');
+            $('ip-purity-blackbox').textContent = t('无法检测', 'Error');
             return;
         }
 
@@ -386,7 +449,7 @@
             fetch('https://ipapi.co/ip/', { signal: v4Controllers[2].signal }).then(r => r.text()).then(t => t.trim())
         ];
 
-        Promise.any(v4Promises).then(firstIp => {
+        racePromises(v4Promises).then(firstIp => {
             v4Controllers.forEach(c => c.abort()); // cancel others
             if (!firstIp.includes(':')) {
                 $('ip-v4-display').textContent = firstIp;
@@ -406,7 +469,7 @@
             fetch('https://api6.ip.sb/ip', { signal: v6Controllers[1].signal }).then(r => r.text()).then(t => t.trim())
         ];
 
-        Promise.any(v6Promises).then(firstIp => {
+        racePromises(v6Promises).then(firstIp => {
             v6Controllers.forEach(c => c.abort()); // cancel others
             if (firstIp.includes(':')) {
                 $('ip-v6-display').textContent = firstIp;
