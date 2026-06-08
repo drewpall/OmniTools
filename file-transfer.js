@@ -126,7 +126,29 @@
 
             queueList: document.getElementById('p2p-queue-list'),
 
-            btnClearHistory: document.getElementById('p2p-btn-clear-history')
+            btnClearHistory: document.getElementById('p2p-btn-clear-history'),
+
+            btnModeFiles: document.getElementById('p2p-btn-mode-files'),
+
+            btnModeClipboard: document.getElementById('p2p-btn-mode-clipboard'),
+
+            clipboardBadge: document.getElementById('p2p-clipboard-badge'),
+
+            filesWorkspace: document.getElementById('p2p-files-workspace'),
+
+            clipboardWorkspace: document.getElementById('p2p-clipboard-workspace'),
+
+            clipboardInput: document.getElementById('p2p-clipboard-input'),
+
+            btnSendClipboard: document.getElementById('p2p-btn-send-clipboard'),
+
+            clipboardAutoClear: document.getElementById('p2p-clipboard-auto-clear'),
+
+            emptyClipboardTip: document.getElementById('p2p-empty-clipboard-tip'),
+
+            clipboardList: document.getElementById('p2p-clipboard-list'),
+
+            btnClearClipboardHistory: document.getElementById('p2p-btn-clear-clipboard-history')
 
         };
 
@@ -327,6 +349,79 @@
                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
 
                     handleFilesToSend(e.dataTransfer.files);
+
+                }
+
+            });
+
+        }
+
+        // Clipboard Mode Tab Switcher
+        if (elements.btnModeFiles && elements.btnModeClipboard) {
+
+            elements.btnModeFiles.addEventListener('click', () => {
+
+                elements.btnModeFiles.classList.add('active');
+
+                elements.btnModeClipboard.classList.remove('active');
+
+                elements.filesWorkspace.style.display = 'grid';
+
+                elements.clipboardWorkspace.style.display = 'none';
+
+            });
+
+            elements.btnModeClipboard.addEventListener('click', () => {
+
+                elements.btnModeClipboard.classList.add('active');
+
+                elements.btnModeFiles.classList.remove('active');
+
+                elements.filesWorkspace.style.display = 'none';
+
+                elements.clipboardWorkspace.style.display = 'grid';
+
+                if (elements.clipboardBadge) {
+
+                    elements.clipboardBadge.style.display = 'none';
+
+                }
+
+            });
+
+        }
+
+        // Clipboard Send and keypress Events
+        if (elements.btnSendClipboard && elements.clipboardInput) {
+
+            elements.btnSendClipboard.addEventListener('click', sendClipboardText);
+
+            elements.clipboardInput.addEventListener('keydown', (e) => {
+
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+
+                    e.preventDefault();
+
+                    sendClipboardText();
+
+                }
+
+            });
+
+        }
+
+        // Clear Clipboard History
+        if (elements.btnClearClipboardHistory) {
+
+            elements.btnClearClipboardHistory.addEventListener('click', () => {
+
+                if (confirm(t('确认清空所有历史剪贴板记录吗？', 'Are you sure you want to clear all clipboard records?'))) {
+
+                    elements.clipboardList.innerHTML = '';
+
+                    elements.clipboardList.style.display = 'none';
+
+                    elements.emptyClipboardTip.style.display = 'flex';
 
                 }
 
@@ -870,6 +965,49 @@
 
         }
 
+        // Clear clipboard workspace state
+        if (elements.clipboardList) {
+
+            elements.clipboardList.innerHTML = '';
+
+            elements.clipboardList.style.display = 'none';
+
+        }
+
+        if (elements.emptyClipboardTip) {
+
+            elements.emptyClipboardTip.style.display = 'flex';
+
+        }
+
+        if (elements.clipboardInput) {
+
+            elements.clipboardInput.value = '';
+
+        }
+
+        if (elements.clipboardBadge) {
+
+            elements.clipboardBadge.style.display = 'none';
+
+        }
+
+        if (elements.btnModeFiles && elements.btnModeClipboard) {
+
+            elements.btnModeFiles.classList.add('active');
+
+            elements.btnModeClipboard.classList.remove('active');
+
+        }
+
+        if (elements.filesWorkspace && elements.clipboardWorkspace) {
+
+            elements.filesWorkspace.style.display = 'grid';
+
+            elements.clipboardWorkspace.style.display = 'none';
+
+        }
+
     }
 
 
@@ -1339,6 +1477,22 @@
                         if (currentIncomingTransferId === transferId) {
 
                             currentIncomingTransferId = null;
+
+                        }
+
+                        break;
+
+                    case 'clipboard':
+
+                        addClipboardItemToUI(data.text, 'receive');
+
+                        if (elements.btnModeClipboard && !elements.btnModeClipboard.classList.contains('active')) {
+
+                            if (elements.clipboardBadge) {
+
+                                elements.clipboardBadge.style.display = 'block';
+
+                            }
 
                         }
 
@@ -1990,7 +2144,136 @@
 
     }
 
+    function sendClipboardText() {
 
+        const text = elements.clipboardInput.value.trim();
+
+        if (!text) {
+
+            alert(t('请输入需要发送的文本内容！', 'Please enter text content to send!'));
+
+            return;
+
+        }
+
+        if (!activeConnection || !activeConnection.open) {
+
+            alert(t('连接已断开，无法发送！', 'Connection disconnected, cannot send!'));
+
+            return;
+
+        }
+
+        try {
+
+            activeConnection.send({
+
+                type: 'clipboard',
+
+                text: text
+
+            });
+
+            addClipboardItemToUI(text, 'send');
+
+            if (elements.clipboardAutoClear && elements.clipboardAutoClear.checked) {
+
+                elements.clipboardInput.value = '';
+
+            }
+
+        } catch (err) {
+
+            alert(t('发送文本出错: ', 'Error sending text: ') + err.message);
+
+        }
+
+    }
+
+    function addClipboardItemToUI(text, direction) {
+
+        if (elements.emptyClipboardTip) elements.emptyClipboardTip.style.display = 'none';
+
+        if (elements.clipboardList) elements.clipboardList.style.display = 'flex';
+
+        const itemId = `cb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const now = new Date();
+
+        const timeString = now.toTimeString().split(' ')[0];
+
+        const directionLabel = direction === 'send' ? t('发送', 'Send') : t('接收', 'Receive');
+
+        const badgeClass = direction === 'send' ? 'badge-orig' : 'badge-comp';
+
+        const item = document.createElement('div');
+
+        item.className = 'p2p-queue-item';
+
+        item.id = `p2p-item-${itemId}`;
+
+        item.innerHTML = `
+            <div class="p2p-item-header" style="align-items: center; display: flex;">
+                <span class="p2p-item-icon" style="margin-right: 12px;">📋</span>
+                <div class="p2p-item-info" style="flex-grow: 1;">
+                    <div class="p2p-item-meta" style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="p2p-direction-badge ${badgeClass}">${directionLabel}</span>
+                        <span style="opacity: 0.6; font-size: 11px;">⏰ ${timeString}</span>
+                    </div>
+                </div>
+                <div class="p2p-item-actions" style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-xs btn-copy-cb" style="padding: 4px 8px; font-size: 11px;">
+                        ${t('📋 复制', '📋 Copy')}
+                    </button>
+                    <button class="btn btn-secondary btn-xs btn-delete-cb" style="border-color: #EF4444; color: #EF4444; padding: 4px 8px; font-size: 11px;">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+            <div class="clipboard-text-content" style="background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 10px; font-family: monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto; text-align: left; color: var(--text-primary); margin-top: 10px;"></div>
+        `;
+
+        item.querySelector('.clipboard-text-content').textContent = text;
+
+        const copyBtn = item.querySelector('.btn-copy-cb');
+
+        copyBtn.addEventListener('click', () => {
+
+            navigator.clipboard.writeText(text).then(() => {
+
+                const origText = copyBtn.innerText;
+
+                copyBtn.innerText = t('已复制', 'Copied');
+
+                setTimeout(() => copyBtn.innerText = origText, 1500);
+
+            });
+
+        });
+
+        const deleteBtn = item.querySelector('.btn-delete-cb');
+
+        deleteBtn.addEventListener('click', () => {
+
+            item.remove();
+
+            if (elements.clipboardList.children.length === 0) {
+
+                elements.clipboardList.style.display = 'none';
+
+                elements.emptyClipboardTip.style.display = 'flex';
+
+            }
+
+        });
+
+        if (elements.clipboardList) {
+
+            elements.clipboardList.insertBefore(item, elements.clipboardList.firstChild);
+
+        }
+
+    }
 
 })();
 

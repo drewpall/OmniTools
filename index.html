@@ -2520,38 +2520,184 @@
                         </div>
 
                         <!-- Main workspace card: send and receive -->
-                        <div class="control-panel-grid">
-                            <!-- Left: File Drop Zone -->
-                            <div class="workspace-card upload-card" style="height: 100%; min-height: 320px;">
-                                <div class="upload-zone" id="p2p-drop-zone">
-                                    <input type="file" id="p2p-file-input" multiple style="display: none;">
-                                    <div class="upload-illustration">
-                                        <div class="pulse-circle" style="background: rgba(139, 92, 246, 0.1);">
-                                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--primary-light)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="upload-arrow"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
-                                        </div>
-                                    </div>
-                                    <div class="upload-text">
-                                        <h3><span class="lang-zh">拖入您要发送的文件 或 <span class="text-highlight">点击浏览</span></span><span class="lang-en">Drag & drop files to send or <span class="text-highlight">browse</span></span></h3>
-                                        <p class="support-info"><span class="lang-zh">支持任意格式、任意大小的文件。支持同时选择多个文件。</span><span class="lang-en">Supports files of any format and size. Multiple selection supported.</span></p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Right: Transfer Queue / Progress Panel -->
-                            <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 16px; min-height: 320px;">
-                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                                    <h3><span class="lang-zh">📁 传输任务列表</span><span class="lang-en">📁 Transfer Queue</span></h3>
-                                    <button id="p2p-btn-clear-history" class="btn btn-secondary btn-xs" style="font-size: 11px;"><span class="lang-zh">清空记录</span><span class="lang-en">Clear History</span></button>
-                                </div>
-                                <div id="p2p-empty-queue-tip" style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; padding: 24px 0;">
-                                    <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">📤</div>
-                                    <p style="font-size: 13px;"><span class="lang-zh">暂无传输任务</span><span class="lang-en">No transfers yet</span></p>
-                                    <p style="font-size: 11px; margin-top: 4px; max-width: 200px;"><span class="lang-zh">在左侧选择文件开始发送，或等待对方给您发送文件</span><span class="lang-en">Select files on the left to send, or wait for incoming files</span></p>
-                                </div>
-                                <div id="p2p-queue-list" style="display: none; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
-                                    <!-- Transfer Items will go here dynamically -->
-                                </div>
-                            </div>
+                        <!-- Tab selector inside active connection panel -->
+
+                        <div style="display: flex; justify-content: flex-start; margin-bottom: 20px;">
+
+                            <div class="view-mode-selector">
+
+                                <button class="mode-btn active" id="p2p-btn-mode-files">
+
+                                    <span class="lang-zh">📁 文件传输</span>
+
+                                    <span class="lang-en">📁 File Transfer</span>
+
+                                </button>
+
+                                <button class="mode-btn" id="p2p-btn-mode-clipboard" style="position: relative;">
+
+                                    <span class="lang-zh">📋 剪贴板同步</span>
+
+                                    <span class="lang-en">📋 Shared Clipboard</span>
+
+                                    <span id="p2p-clipboard-badge" style="display: none; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background-color: #EF4444; border-radius: 50%;"></span>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- File Transfer Workspace -->
+
+                        <div id="p2p-files-workspace" class="control-panel-grid">
+
+                            <!-- Left: File Drop Zone -->
+
+                            <div class="workspace-card upload-card" style="height: 100%; min-height: 320px;">
+
+                                <div class="upload-zone" id="p2p-drop-zone">
+
+                                    <input type="file" id="p2p-file-input" multiple style="display: none;">
+
+                                    <div class="upload-illustration">
+
+                                        <div class="pulse-circle" style="background: rgba(139, 92, 246, 0.1);">
+
+                                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--primary-light)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="upload-arrow"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="upload-text">
+
+                                        <h3><span class="lang-zh">拖入您要发送的文件 或 <span class="text-highlight">点击浏览</span></span><span class="lang-en">Drag & drop files to send or <span class="text-highlight">browse</span></span></h3>
+
+                                        <p class="support-info"><span class="lang-zh">支持任意格式、任意大小的文件。支持同时选择多个文件。</span><span class="lang-en">Supports files of any format and size. Multiple selection supported.</span></p>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- Right: Transfer Queue / Progress Panel -->
+
+                            <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 16px; min-height: 320px;">
+
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+
+                                    <h3><span class="lang-zh">📁 传输任务列表</span><span class="lang-en">📁 Transfer Queue</span></h3>
+
+                                    <button id="p2p-btn-clear-history" class="btn btn-secondary btn-xs" style="font-size: 11px;"><span class="lang-zh">清空记录</span><span class="lang-en">Clear History</span></button>
+
+                                </div>
+
+                                <div id="p2p-empty-queue-tip" style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; padding: 24px 0;">
+
+                                    <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">📤</div>
+
+                                    <p style="font-size: 13px;"><span class="lang-zh">暂无传输任务</span><span class="lang-en">No transfers yet</span></p>
+
+                                    <p style="font-size: 11px; margin-top: 4px; max-width: 200px;"><span class="lang-zh">在左侧选择文件开始发送，或等待对方给您发送文件</span><span class="lang-en">Select files on the left to send, or wait for incoming files</span></p>
+
+                                </div>
+
+                                <div id="p2p-queue-list" style="display: none; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+
+                                    <!-- Transfer Items will go here dynamically -->
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Shared Clipboard Workspace -->
+
+                        <div id="p2p-clipboard-workspace" class="control-panel-grid" style="display: none;">
+
+                            <!-- Left: Send Clipboard -->
+
+                            <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 16px; min-height: 320px;">
+
+                                <div class="card-header">
+
+                                    <h3><span class="lang-zh">📤 发送剪贴板文本</span><span class="lang-en">📤 Send Clipboard Text</span></h3>
+
+                                </div>
+
+                                <div class="dev-editor-wrapper" style="flex-grow: 1; min-height: 180px;">
+
+                                    <textarea id="p2p-clipboard-input" placeholder="在此输入或粘贴文本，点击发送将实时传输到另一台设备上..." data-placeholder-zh="在此输入或粘贴文本，点击发送将实时传输到另一台设备上..." data-placeholder-en="Type or paste text here, then click Send to transmit in real-time..."></textarea>
+
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+
+                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-primary); user-select: none;">
+
+                                        <input type="checkbox" id="p2p-clipboard-auto-clear" checked style="width: 16px; height: 16px; accent-color: var(--primary-light); cursor: pointer;">
+
+                                        <span>
+
+                                            <span class="lang-zh">发送后自动清空输入框</span>
+
+                                            <span class="lang-en">Auto-clear after sending</span>
+
+                                        </span>
+
+                                    </label>
+
+                                    <button id="p2p-btn-send-clipboard" class="btn btn-primary glow-btn" style="padding: 10px 24px;">
+
+                                        <span><span class="lang-zh">🚀 发送</span><span class="lang-en">🚀 Send</span></span>
+
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- Right: Clipboard History -->
+
+                            <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 16px; min-height: 320px;">
+
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+
+                                    <h3><span class="lang-zh">📥 历史接收记录</span><span class="lang-en">📥 Received History</span></h3>
+
+                                    <button id="p2p-btn-clear-clipboard-history" class="btn btn-secondary btn-xs" style="font-size: 11px;"><span class="lang-zh">清空记录</span><span class="lang-en">Clear History</span></button>
+
+                                </div>
+
+                                <div id="p2p-empty-clipboard-tip" style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); text-align: center; padding: 24px 0;">
+
+                                    <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.5;">📋</div>
+
+                                    <p style="font-size: 13px;"><span class="lang-zh">暂无接收记录</span><span class="lang-en">No records yet</span></p>
+
+                                    <p style="font-size: 11px; margin-top: 4px; max-width: 200px;"><span class="lang-zh">当对方发送剪贴板内容时，会在此处实时显示</span><span class="lang-en">Clipboard content sent by the peer will appear here in real-time</span></p>
+
+                                </div>
+
+                                <div id="p2p-clipboard-list" style="display: none; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+
+                                    <!-- Clipboard Items will go here dynamically -->
+
+                                </div>
+
+                            </div>
+
                         </div>
                     </div>
                 </div>
