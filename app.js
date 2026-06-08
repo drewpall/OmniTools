@@ -2326,6 +2326,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+            } else if (target === 'ip-info') {
+
+
+
+
+
+
+
+                document.getElementById('ip-info-page').classList.add('active');
+
+
+
+
+
+
+
+                toolTitle.innerText = t("🌐 IP 信息查询", "🌐 IP Information");
+
+
+
+
+
+
+
+                toolDesc.innerText = t("获取公网 IP 双栈信息、地理定位、IP 纯净度、安全分析、延迟测试、Whois 档案与子网计算", "Get public dual-stack IP information, geo-location, IP purity, security analysis, latency check, Whois registry, and subnet calculations");
+
+
+
+
+
+
+
+                if (window.initIpInfo) {
+
+
+
+
+
+
+
+                    window.initIpInfo();
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
             } else {
 
 
@@ -2479,6 +2535,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
                 transferNavItem.click();
+
+
+
+
+
+
+
+            }, 100);
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+    if (window.location.hash.startsWith('#ip-info')) {
+
+
+
+
+
+
+
+        const ipInfoNavItem = document.querySelector('.nav-item[data-target="ip-info"]');
+
+
+
+
+
+
+
+        if (ipInfoNavItem) {
+
+
+
+
+
+
+
+            setTimeout(() => {
+
+
+
+
+
+
+
+                ipInfoNavItem.click();
 
 
 

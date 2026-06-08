@@ -45,6 +45,18 @@
     <script src="app.js?v=1.0.2" defer></script>
     <!-- P2P File Transfer Logic -->
     <script src="file-transfer.js?v=1.0.2" defer></script>
+    <!-- Leaflet Map library -->
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
+
+    <!-- IP Info Logic -->
+
+    <script src="ip-info.js?v=1.0.0" defer></script>
+
 </head>
 <body>
     <div class="app-container">
@@ -112,6 +124,20 @@
                         <span class="lang-zh">P2P 文件闪传</span>
                         <span class="lang-en">P2P File Transfer</span>
                     </span>
+                </a>
+
+                <a href="#" class="nav-item" data-target="ip-info">
+
+                    <span class="nav-icon">🌐</span>
+
+                    <span class="nav-label">
+
+                        <span class="lang-zh">IP 信息查询</span>
+
+                        <span class="lang-en">IP Information</span>
+
+                    </span>
+
                 </a>
             </nav>
         </aside>
@@ -2702,6 +2728,538 @@
                     </div>
                 </div>
 
+                <!-- Tool Page 8: IP Info Lookup & Diagnostics -->
+
+                <div id="ip-info-page" class="tool-page">
+
+                    <!-- Top Summary Card: Large IPv4 & IPv6 Info -->
+
+                    <div class="control-panel-grid" style="grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+
+                        <div class="workspace-card details-card" style="padding: 20px; display: flex; flex-direction: column; justify-content: center; min-height: 100px;">
+
+                            <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-blue);">
+
+                                <span class="lang-zh">IPv4 地址</span>
+
+                                <span class="lang-en">IPv4 Address</span>
+
+                            </span>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+
+                                <h2 id="ip-v4-display" style="font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; color: var(--text-primary); margin: 0;">检测中...</h2>
+
+                                <button class="btn btn-secondary btn-xs" id="ip-btn-copy-v4">📋 复制 / Copy</button>
+
+                            </div>
+
+                        </div>
+
+                        <div class="workspace-card details-card" style="padding: 20px; display: flex; flex-direction: column; justify-content: center; min-height: 100px;">
+
+                            <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-purple);">
+
+                                <span class="lang-zh">IPv6 地址</span>
+
+                                <span class="lang-en">IPv6 Address</span>
+
+                            </span>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+
+                                <h2 id="ip-v6-display" style="font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; color: var(--text-primary); margin: 0;">检测中...</h2>
+
+                                <button class="btn btn-secondary btn-xs" id="ip-btn-copy-v6" disabled>📋 复制 / Copy</button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Search Lookup Panel -->
+
+                    <div class="workspace-card" style="padding: 18px; margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+
+                        <input type="text" id="ip-lookup-input" class="select-control" placeholder="查询其它 IP 地址 (例如: 8.8.8.8)..." data-placeholder-zh="查询其它 IP 地址 (例如: 8.8.8.8)..." data-placeholder-en="Lookup other IP address (e.g., 8.8.8.8)..." style="flex-grow: 1; padding: 12px 16px; font-size: 14px; min-width: 200px;">
+
+                        <button id="ip-btn-lookup" class="btn btn-primary glow-btn" style="padding: 12px 24px; white-space: nowrap; height: 44px; display: flex; align-items: center;">
+
+                            <span><span class="lang-zh">🔍 查询 IP</span><span class="lang-en">🔍 Lookup</span></span>
+
+                        </button>
+
+                        <button id="ip-btn-refresh" class="btn btn-secondary" style="padding: 12px 18px; white-space: nowrap; height: 44px; display: flex; align-items: center;">
+
+                            <span><span class="lang-zh">🔄 刷新我的 IP</span><span class="lang-en">🔄 My IP</span></span>
+
+                        </button>
+
+                    </div>
+
+
+
+                    <!-- Main Grid -->
+
+                    <div class="control-panel-grid">
+
+                        <!-- Column Left: Geolocation & Map & Subnet Calculator -->
+
+                        <div style="display: flex; flex-direction: column; gap: 24px;">
+
+                            <!-- Geo Info -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">📍 地理位置定位</span><span class="lang-en">📍 Geolocation Details</span></h3>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">国家 / 地区</span><span class="lang-en">Country / Flag</span></span>
+
+                                        <span class="meta-val" id="ip-info-country">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">省份 / 州</span><span class="lang-en">Region / State</span></span>
+
+                                        <span class="meta-val" id="ip-info-region">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">城市</span><span class="lang-en">City</span></span>
+
+                                        <span class="meta-val" id="ip-info-city">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">邮政编码</span><span class="lang-en">Postal Code</span></span>
+
+                                        <span class="meta-val" id="ip-info-zip">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">经纬度</span><span class="lang-en">Coordinates</span></span>
+
+                                        <span class="meta-val" id="ip-info-coordinates">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- Map container -->
+
+                            <div class="workspace-card details-card" style="padding: 10px; height: 260px; position: relative;">
+
+                                <div id="ip-map" style="width: 100%; height: 100%; border-radius: 8px; background: rgba(0,0,0,0.2); z-index: 1;"></div>
+
+                            </div>
+
+
+
+                            <!-- CIDR / Subnet Calculator -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">🧮 IP 子网计算器 (CIDR)</span><span class="lang-en">🧮 Subnet Calculator (CIDR)</span></h3>
+
+                                </div>
+
+                                <div class="config-row" style="margin-bottom: 16px; gap: 8px;">
+
+                                    <input type="text" id="ip-subnet-input" class="select-control" style="flex: 2; font-family: monospace; font-size: 13px; height: 36px; padding: 6px 12px;" placeholder="例如: 192.168.1.1/24">
+
+                                    <button class="btn btn-primary btn-sm" id="ip-btn-calc-subnet" style="flex: 1; height: 36px;">
+
+                                        <span class="lang-zh">计算</span><span class="lang-en">Calc</span>
+
+                                    </button>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">子网掩码</span><span class="lang-en">Subnet Mask</span></span>
+
+                                        <span class="meta-val" id="ip-subnet-mask" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">网络地址</span><span class="lang-en">Network Address</span></span>
+
+                                        <span class="meta-val" id="ip-subnet-net" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">广播地址</span><span class="lang-en">Broadcast Address</span></span>
+
+                                        <span class="meta-val" id="ip-subnet-broadcast" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">可用 IP 范围</span><span class="lang-en">Usable IP Range</span></span>
+
+                                        <span class="meta-val" id="ip-subnet-range" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">总可用主机数</span><span class="lang-en">Total Host Count</span></span>
+
+                                        <span class="meta-val" id="ip-subnet-hosts" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Column Right: Purity, Routing, DNS, Latency, RDAP -->
+
+                        <div style="display: flex; flex-direction: column; gap: 24px;">
+
+                            <!-- IP Purity card -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">🛡️ IP 纯净度与安全检测</span><span class="lang-en">🛡️ IP Purity & Security</span></h3>
+
+                                    <span id="ip-purity-score-badge" class="preview-badge badge-orig" style="font-size: 14px; font-weight: 800; padding: 6px 12px; border-radius: 8px;">-%</span>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">代理/VPN/Tor 节点</span><span class="lang-en">Proxy / VPN / Tor</span></span>
+
+                                        <span class="meta-val" id="ip-purity-proxy">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">云托管/数据中心 (Hosting)</span><span class="lang-en">Data Center / Hosting</span></span>
+
+                                        <span class="meta-val" id="ip-purity-hosting">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">移动数据蜂窝网络 (Mobile)</span><span class="lang-en">Mobile Cellular Connection</span></span>
+
+                                        <span class="meta-val" id="ip-purity-mobile">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">黑名单匿名信誉度</span><span class="lang-en">Blackbox Reputation</span></span>
+
+                                        <span class="meta-val" id="ip-purity-blackbox">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- ISP Info -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">🏢 网络与运营商</span><span class="lang-en">🏢 ISP & Routing</span></h3>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">运营商 (ISP)</span><span class="lang-en">ISP</span></span>
+
+                                        <span class="meta-val" id="ip-info-isp">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">组织机构 (Organization)</span><span class="lang-en">Organization</span></span>
+
+                                        <span class="meta-val" id="ip-info-org">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">自治系统 (ASN)</span><span class="lang-en">ASN</span></span>
+
+                                        <span class="meta-val" id="ip-info-asn">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">网络段范围 (Route)</span><span class="lang-en">Network Range</span></span>
+
+                                        <span class="meta-val" id="ip-info-range" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- DNS & Local Details -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">🕵️‍♂️ DNS 解析与 WebRTC 检测</span><span class="lang-en">🕵️‍♂️ DNS & WebRTC Detection</span></h3>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+
+                                        <span class="meta-label"><span class="lang-zh">域解析 DNS 服务商</span><span class="lang-en">DNS Resolver</span></span>
+
+                                        <span class="meta-val" id="ip-info-dns" style="font-size: 12.5px; text-align: right; max-width: 60%;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+
+                                        <span class="meta-label"><span class="lang-zh">WebRTC 局域网泄露 IP</span><span class="lang-en">WebRTC Internal IPs</span></span>
+
+                                        <span class="meta-val" id="ip-info-webrtc" style="font-family: monospace; font-size: 12px; text-align: right; max-width: 60%;">检测中...</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">操作系统 / 浏览器</span><span class="lang-en">User Agent</span></span>
+
+                                        <span class="meta-val" id="ip-info-ua" style="font-size: 12px; max-width: 60%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">本地时间 / 时区</span><span class="lang-en">Local Time / Zone</span></span>
+
+                                        <span class="meta-val" id="ip-info-timezone">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">系统首选语言</span><span class="lang-en">Preferred Language</span></span>
+
+                                        <span class="meta-val" id="ip-info-lang">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- Ping Latency test -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">⚡ Anycast 延迟诊断 (RTT)</span><span class="lang-en">⚡ Anycast Ping Diagnostics</span></h3>
+
+                                    <button class="btn btn-secondary btn-xs" id="ip-btn-ping-test">🔄 重新测试 / Retest</button>
+
+                                </div>
+
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+
+                                    <div>
+
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+
+                                            <span>Cloudflare (1.1.1.1)</span>
+
+                                            <span id="ip-ping-cf" style="font-weight: 600;">测速中...</span>
+
+                                        </div>
+
+                                        <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+
+                                            <div id="ip-ping-cf-bar" style="height: 100%; width: 0%; background: #10B981; transition: width 0.3s ease;"></div>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div>
+
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+
+                                            <span>Google DNS (8.8.8.8)</span>
+
+                                            <span id="ip-ping-google" style="font-weight: 600;">测速中...</span>
+
+                                        </div>
+
+                                        <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+
+                                            <div id="ip-ping-google-bar" style="height: 100%; width: 0%; background: #10B981; transition: width 0.3s ease;"></div>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div>
+
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+
+                                            <span>AliDNS (223.5.5.5)</span>
+
+                                            <span id="ip-ping-ali" style="font-weight: 600;">测速中...</span>
+
+                                        </div>
+
+                                        <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+
+                                            <div id="ip-ping-ali-bar" style="height: 100%; width: 0%; background: #10B981; transition: width 0.3s ease;"></div>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div>
+
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+
+                                            <span>BaiduDNS (180.76.76.76)</span>
+
+                                            <span id="ip-ping-baidu" style="font-weight: 600;">测速中...</span>
+
+                                        </div>
+
+                                        <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+
+                                            <div id="ip-ping-baidu-bar" style="height: 100%; width: 0%; background: #10B981; transition: width 0.3s ease;"></div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- WHOIS / RDAP Details -->
+
+                            <div class="workspace-card details-card" style="padding: 20px;">
+
+                                <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px;">
+
+                                    <h3 style="font-size: 15px; font-weight: 600; margin: 0;"><span class="lang-zh">📜 IP 注册人 Whois 档案</span><span class="lang-en">📜 WHOIS / RDAP Registry</span></h3>
+
+                                </div>
+
+                                <div class="meta-list" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">所属区域注册局</span><span class="lang-en">Registry Agency</span></span>
+
+                                        <span class="meta-val" id="ip-whois-source">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">注册机构名称</span><span class="lang-en">Handle Name</span></span>
+
+                                        <span class="meta-val" id="ip-whois-handle">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between;">
+
+                                        <span class="meta-label"><span class="lang-zh">创建注册时间</span><span class="lang-en">Registration Date</span></span>
+
+                                        <span class="meta-val" id="ip-whois-date">-</span>
+
+                                    </div>
+
+                                    <div class="meta-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+
+                                        <span class="meta-label"><span class="lang-zh">滥用举报 / 投诉邮箱</span><span class="lang-en">Abuse Complaint Email</span></span>
+
+                                        <span class="meta-val" id="ip-whois-abuse" style="font-family: monospace;">-</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
                 <!-- Tool Page Placeholder: Coming Soon -->
                 <div id="coming-soon-page" class="tool-page">
                     <div class="workspace-card placeholder-card">
