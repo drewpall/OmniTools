@@ -42,6 +42,8 @@
 
     let stats = { total: 0, pending: 0, success: 0, failed: 0 };
 
+    let currentEngine = 'msal';
+
 
 
     // Translation helper
@@ -360,6 +362,73 @@
             }
         });
 
+        // Manual add single recipient email
+        $('email-btn-add-single').addEventListener('click', () => {
+            const singleEmail = $('email-single-recipient').value.trim();
+            if (!singleEmail || !singleEmail.includes('@')) {
+                alert(t('请输入有效的收件人邮箱！', 'Please enter a valid recipient email address!'));
+                return;
+            }
+
+            // Init emailKey if not set
+            if (!emailKey) {
+                emailKey = 'email';
+            }
+
+            const newRow = {};
+            newRow[emailKey] = singleEmail;
+            
+            queue.push(newRow);
+            $('email-single-recipient').value = '';
+            
+            // Re-render preview UI
+            renderRecipientPreview(['email']);
+            logToConsole(t(`➕ 手动添加收件人: ${singleEmail}，当前共有 ${queue.length} 个收件人。`, `➕ Manually added recipient: ${singleEmail}. Total: ${queue.length}`));
+        });
+
+        // Dual-Engine Tabs Switch
+        $('email-tab-msal').addEventListener('click', () => switchEngine('msal'));
+        $('email-tab-smtp').addEventListener('click', () => switchEngine('smtp'));
+        
+        // SMTP Form Inputs Validation
+        $('email-smtp-user').addEventListener('input', validateSmtpForm);
+        $('email-smtp-pass').addEventListener('input', validateSmtpForm);
+        $('email-smtp-host').addEventListener('input', validateSmtpForm);
+        $('email-smtp-port').addEventListener('input', validateSmtpForm);
+
+        // SMTP Auto-completion helper
+        $('email-smtp-user').addEventListener('blur', (e) => {
+            const val = e.target.value.trim().toLowerCase();
+            const hostInput = $('email-smtp-host');
+            const portInput = $('email-smtp-port');
+            const secureInput = $('email-smtp-secure');
+
+            if (!hostInput.value) {
+                if (val.endsWith('@qq.com')) {
+                    hostInput.value = 'smtp.qq.com';
+                    portInput.value = '465';
+                    secureInput.checked = true;
+                } else if (val.endsWith('@163.com')) {
+                    hostInput.value = 'smtp.163.com';
+                    portInput.value = '465';
+                    secureInput.checked = true;
+                } else if (val.endsWith('@126.com')) {
+                    hostInput.value = 'smtp.126.com';
+                    portInput.value = '465';
+                    secureInput.checked = true;
+                } else if (val.endsWith('@gmail.com')) {
+                    hostInput.value = 'smtp.gmail.com';
+                    portInput.value = '465';
+                    secureInput.checked = true;
+                } else if (val.endsWith('@outlook.com') || val.endsWith('@hotmail.com')) {
+                    hostInput.value = 'smtp-mail.outlook.com';
+                    portInput.value = '587';
+                    secureInput.checked = false;
+                }
+            }
+            validateSmtpForm();
+        });
+
         // Clear log console
 
         $('email-btn-clear-logs').addEventListener('click', () => {
@@ -564,132 +633,124 @@
 
 
 
+        renderRecipientPreview(headers);
+    }
+
+    function renderRecipientPreview(headers) {
         // Render preview table
-
         const table = $('email-preview-table');
-
         table.innerHTML = '';
-
         
-
         // Headers
-
         const trHead = document.createElement('tr');
-
         headers.forEach(h => {
-
             const th = document.createElement('th');
-
             th.textContent = h;
-
             trHead.appendChild(th);
-
         });
-
         // Status column header
-
         const thStatus = document.createElement('th');
-
         thStatus.textContent = t('状态', 'Status');
-
         trHead.appendChild(thStatus);
-
         table.appendChild(trHead);
 
-
-
         // Data Rows preview
-
         queue.forEach((row, rowIndex) => {
-
             const tr = document.createElement('tr');
-
             tr.id = `email-row-${rowIndex}`;
-
             headers.forEach(h => {
-
                 const td = document.createElement('td');
-
-                td.textContent = row[h.toLowerCase()];
-
+                td.textContent = row[h.toLowerCase()] || '';
                 tr.appendChild(td);
-
             });
-
             const tdStatus = document.createElement('td');
-
             tdStatus.id = `email-status-${rowIndex}`;
-
             tdStatus.textContent = t('等待中 / Ready', 'Ready');
-
             tdStatus.style.opacity = '0.5';
-
             tr.appendChild(tdStatus);
-
             table.appendChild(tr);
-
         });
-
-
 
         $('email-recipients-preview-container').style.display = 'block';
 
-
-
         // Update stats
-
         stats = { total: queue.length, pending: queue.length, success: 0, failed: 0 };
-
         updateStatsCounters();
 
 
 
-        // Enable Start button if logged in
-
-        if (getActiveAccount()) {
-
+        // Enable Start button if logged in or using SMTP
+        if (currentEngine === 'smtp') {
+            validateSmtpForm();
+        } else if (getActiveAccount() || $('email-manual-token-input').value.trim()) {
             $('email-btn-start').disabled = false;
-
         }
-
     }
 
 
 
     function parseCSV(text) {
-
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) return null;
 
-        if (lines.length < 2) return null;
+        // Auto check: if first line is a valid email (or doesn't contain common CSV headers),
+        // we can assume it's just a raw list of emails.
+        const looksLikeEmail = (str) => {
+            return str.includes('@') && str.includes('.');
+        };
 
+        const firstLine = lines[0];
+        const firstLineCols = parseCSVLine(firstLine);
         
+        let hasHeader = false;
+        // If there's an email/邮箱/mail in the first line columns, we treat it as header.
+        // Otherwise, if any of the columns look like an email address, or there is only 1 line, or no header keyword is matched, we assume NO header.
+        const hasHeaderKeywords = firstLineCols.some(col => {
+            const low = col.toLowerCase();
+            return low === 'email' || low === '邮箱' || low === 'mail';
+        });
 
-        const headers = parseCSVLine(lines[0]);
-
-        const data = [];
-
-        
-
-        for (let i = 1; i < lines.length; i++) {
-
-            const row = parseCSVLine(lines[i]);
-
-            if (row.length === 0) continue;
-
-            const entry = {};
-
-            headers.forEach((h, index) => {
-
-                entry[h.toLowerCase()] = row[index] || '';
-
-            });
-
-            data.push(entry);
-
+        if (hasHeaderKeywords) {
+            hasHeader = true;
         }
 
-        return { headers, data };
+        let headers = [];
+        let startIdx = 0;
 
+        if (hasHeader) {
+            headers = firstLineCols;
+            startIdx = 1;
+        } else {
+            // Check if there is only one column or it looks like a list of emails
+            // Create a default header
+            const maxCols = Math.max(...lines.map(l => parseCSVLine(l).length));
+            if (maxCols === 1) {
+                headers = ['email'];
+            } else {
+                headers = [];
+                for (let c = 0; c < maxCols; c++) {
+                    // Make the first one email if it looks like email, or if it's the first column
+                    if (c === 0) {
+                        headers.push('email');
+                    } else {
+                        headers.push(`param${c}`);
+                    }
+                }
+            }
+            startIdx = 0;
+        }
+
+        const data = [];
+        for (let i = startIdx; i < lines.length; i++) {
+            const row = parseCSVLine(lines[i]);
+            if (row.length === 0) continue;
+            const entry = {};
+            headers.forEach((h, index) => {
+                entry[h.toLowerCase()] = row[index] || '';
+            });
+            data.push(entry);
+        }
+        return { headers, data };
     }
 
 
@@ -955,152 +1016,159 @@
 
 
     async function processQueue() {
-
         if (!isSending || isPaused) return;
 
-
-
         if (queueIndex >= queue.length) {
-
             isSending = false;
-
             $('email-btn-pause').style.display = 'none';
-
             $('email-btn-stop').style.display = 'none';
-
             $('email-btn-start').style.display = 'flex';
-
             
-
             $('email-status-badge').textContent = t('已完成 / Finished', 'Finished');
-
             $('email-status-badge').style.background = 'rgba(16, 185, 129, 0.15)';
-
             $('email-status-badge').style.color = '#10B981';
 
-
-
             logToConsole(t('🎉 所有邮件群发任务已完成！', '🎉 All bulk email tasks completed!'));
-
             alert(t('所有邮件发送任务已完成！', 'All email tasks completed!'));
-
             return;
-
         }
-
-
 
         const row = queue[queueIndex];
-
         const recipientEmail = row[emailKey];
 
-
-
         if (!recipientEmail) {
-
             logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 跳过: 未找到邮箱地址`);
-
             stats.failed++;
-
             stats.pending--;
-
             updateStatsCounters();
-
             updateTableRowStatus(queueIndex, 'failed');
-
             queueIndex++;
-
             processQueue();
-
             return;
-
         }
-
-
 
         updateTableRowStatus(queueIndex, 'sending');
-
         logToConsole(`[${queueIndex + 1}/${queue.length}] 📤 正在发送给: ${recipientEmail}...`);
 
-
-
-        const token = await getAccessToken();
-
-        if (!token) {
-
-            logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 失败: 无法获取 Access Token，暂停队列。`);
-
-            pauseSending();
-
-            return;
-
-        }
-
-
-
         const finalSubject = renderTemplate(subjectTemplate, row);
-
         const finalBody = renderTemplate(bodyTemplate, row);
 
+        let sendSuccess = false;
+        let errMsg = "";
 
-
-        try {
-
-            await sendMailAPI(token, finalSubject, finalBody, contentType, recipientEmail);
-
-            logToConsole(`[${queueIndex + 1}/${queue.length}] ✅ 成功发送给 ${recipientEmail}`);
-
-            stats.success++;
-
-            stats.pending--;
-
-            updateStatsCounters();
-
-            updateTableRowStatus(queueIndex, 'success');
-
-            
-
-            queueIndex++;
-
-
-
-            // Schedule next send
-
-            const baseDelay = parseInt($('email-delay-slider').value, 10) * 1000;
-
-            // Add random 0-2 seconds human simulation bias
-
-            const randomBias = Math.random() * 2000;
-
-            const nextDelay = baseDelay + randomBias;
-
-            
-
-            sendTimer = setTimeout(processQueue, nextDelay);
-
-        } catch (err) {
-
-            logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 发送失败 (${recipientEmail}): ${err.message}`);
-
-            stats.failed++;
-
-            stats.pending--;
-
-            updateStatsCounters();
-
-            updateTableRowStatus(queueIndex, 'failed');
-
-            
-
-            queueIndex++;
-
-            sendTimer = setTimeout(processQueue, 3500); // 3.5s delay before moving to next after error
-
+        if (currentEngine === 'msal') {
+            const token = await getAccessToken();
+            if (!token) {
+                logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 失败: 无法获取 Access Token，暂停队列。`);
+                pauseSending();
+                return;
+            }
+            try {
+                await sendMailAPI(token, finalSubject, finalBody, contentType, recipientEmail);
+                sendSuccess = true;
+            } catch (err) {
+                errMsg = err.message;
+            }
+        } else {
+            const smtpConfig = {
+                smtpHost: $('email-smtp-host').value.trim(),
+                smtpPort: $('email-smtp-port').value.trim(),
+                secure: $('email-smtp-secure').checked,
+                user: $('email-smtp-user').value.trim(),
+                pass: $('email-smtp-pass').value.trim(),
+                to: recipientEmail,
+                subject: finalSubject,
+                body: finalBody,
+                contentType: contentType
+            };
+            try {
+                await sendMailSMTP(smtpConfig);
+                sendSuccess = true;
+            } catch (err) {
+                errMsg = err.message;
+            }
         }
 
+        if (sendSuccess) {
+            logToConsole(`[${queueIndex + 1}/${queue.length}] ✅ 成功发送给 ${recipientEmail}`);
+            stats.success++;
+            stats.pending--;
+            updateStatsCounters();
+            updateTableRowStatus(queueIndex, 'success');
+            
+            queueIndex++;
+
+            const baseDelay = parseInt($('email-delay-slider').value, 10) * 1000;
+            const randomBias = Math.random() * 2000;
+            const nextDelay = baseDelay + randomBias;
+            
+            sendTimer = setTimeout(processQueue, nextDelay);
+        } else {
+            logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 发送失败 (${recipientEmail}): ${errMsg}`);
+            stats.failed++;
+            stats.pending--;
+            updateStatsCounters();
+            updateTableRowStatus(queueIndex, 'failed');
+            
+            queueIndex++;
+            sendTimer = setTimeout(processQueue, 3500);
+        }
     }
 
+    function switchEngine(engine) {
+        currentEngine = engine;
+        const msalTab = $('email-tab-msal');
+        const smtpTab = $('email-tab-smtp');
+        const msalConfig = $('email-msal-config');
+        const smtpConfig = $('email-smtp-config');
 
+        if (engine === 'msal') {
+            msalTab.classList.add('active');
+            smtpTab.classList.remove('active');
+            msalConfig.style.display = 'block';
+            smtpConfig.style.display = 'none';
+            const account = getActiveAccount();
+            updateAuthUI(account);
+        } else {
+            msalTab.classList.remove('active');
+            smtpTab.classList.add('active');
+            msalConfig.style.display = 'none';
+            smtpConfig.style.display = 'flex';
+            validateSmtpForm();
+        }
+    }
+
+    function validateSmtpForm() {
+        if (currentEngine !== 'smtp') return;
+        const user = $('email-smtp-user').value.trim();
+        const pass = $('email-smtp-pass').value.trim();
+        const host = $('email-smtp-host').value.trim();
+        const port = $('email-smtp-port').value.trim();
+        const startBtn = $('email-btn-start');
+
+        if (user && pass && host && port && queue.length > 0) {
+            startBtn.disabled = false;
+        } else {
+            startBtn.disabled = true;
+        }
+    }
+
+    async function sendMailSMTP(config) {
+        const url = "/api/send-email";
+        const response = await fetchWithTimeout(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(config),
+            timeout: 15000
+        });
+
+        if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error ? errJson.error : `SMTP Error ${response.status}`);
+        }
+    }
 
     async function sendMailAPI(token, subject, body, contentType, recipientEmail) {
 

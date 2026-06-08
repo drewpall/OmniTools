@@ -5822,46 +5822,85 @@
 
                     <div class="workspace-card details-card" style="padding: 20px; margin-bottom: 24px;">
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                                                <!-- Email Engine Selection Tabs -->
+                        <div class="email-engine-tabs">
+                            <button id="email-tab-msal" class="email-engine-tab active">
+                                <span class="lang-zh">🌐 微软 Graph API 模式</span>
+                                <span class="lang-en">🌐 Microsoft Graph API</span>
+                            </button>
+                            <button id="email-tab-smtp" class="email-engine-tab">
+                                <span class="lang-zh">📨 通用 SMTP 模式</span>
+                                <span class="lang-en">📨 General SMTP Server</span>
+                            </button>
+                        </div>
 
-                            <div>
-
-                                <h3 style="font-size: 16px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px;">
-
-                                    <span>📧</span>
-
-                                    <span class="lang-zh">邮件群发与个性化模板助手</span>
-
-                                    <span class="lang-en">Email Bulk Sender & Mail Merge</span>
-
-                                </h3>
-
-                                <p style="font-size: 12px; opacity: 0.6; margin: 6px 0 0 0;" id="email-auth-status">
-
-                                    <span class="lang-zh">未连接到邮箱服务，请登录你的 Outlook/Office365 账户。</span>
-
-                                    <span class="lang-en">Not connected. Please log in to your Outlook/Office365 account.</span>
-
-                                </p>
-
+                        <!-- Microsoft Auth Config Container -->
+                        <div id="email-msal-config">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                                <div>
+                                    <h3 style="font-size: 16px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                        <span>📧</span>
+                                        <span class="lang-zh">邮件群发与个性化模板助手</span>
+                                        <span class="lang-en">Email Bulk Sender & Mail Merge</span>
+                                    </h3>
+                                    <p style="font-size: 12px; opacity: 0.6; margin: 6px 0 0 0;" id="email-auth-status">
+                                        <span class="lang-zh">未连接到邮箱服务，请登录你的 Outlook/Office365 账户。</span>
+                                        <span class="lang-en">Not connected. Please log in to your Outlook/Office365 account.</span>
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <button id="email-btn-login" class="btn btn-primary glow-btn" style="padding: 10px 20px; font-size: 13.5px; height: 38px; display: flex; align-items: center;">
+                                        <span><span class="lang-zh">🔑 登录 Outlook</span><span class="lang-en">🔑 Log in Outlook</span></span>
+                                    </button>
+                                    <button id="email-btn-logout" class="btn btn-secondary" style="padding: 10px 20px; font-size: 13.5px; height: 38px; display: none; align-items: center; border-color: #EF4444; color: #EF4444;">
+                                        <span><span class="lang-zh">🚪 退出登录</span><span class="lang-en">🚪 Log out</span></span>
+                                    </button>
+                                </div>
                             </div>
+                        </div>
 
-                            <div style="display: flex; gap: 12px; align-items: center;">
-
-                                <button id="email-btn-login" class="btn btn-primary glow-btn" style="padding: 10px 20px; font-size: 13.5px; height: 38px; display: flex; align-items: center;">
-
-                                    <span><span class="lang-zh">🔑 登录 Outlook</span><span class="lang-en">🔑 Log in Outlook</span></span>
-
-                                </button>
-
-                                <button id="email-btn-logout" class="btn btn-secondary" style="padding: 10px 20px; font-size: 13.5px; height: 38px; display: none; align-items: center; border-color: #EF4444; color: #EF4444;">
-
-                                    <span><span class="lang-zh">🚪 退出登录</span><span class="lang-en">🚪 Log out</span></span>
-
-                                </button>
-
+                        <!-- Generic SMTP Config Container -->
+                        <div id="email-smtp-config" style="display: none; flex-direction: column; gap: 14px;">
+                            <div class="email-form-row">
+                                <div>
+                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                        <span class="lang-zh">发信邮箱账号 (Username)</span><span class="lang-en">Sender Email Address</span>
+                                    </label>
+                                    <input type="text" id="email-smtp-user" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px;" placeholder="例如: name@qq.com" data-placeholder-zh="例如: name@qq.com" data-placeholder-en="E.g. name@qq.com">
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                        <span class="lang-zh">邮箱 SMTP 授权码 / 密码</span><span class="lang-en">SMTP Password / Auth Code</span>
+                                    </label>
+                                    <input type="password" id="email-smtp-pass" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px;" placeholder="对于 QQ/163 邮箱请输入授权码" data-placeholder-zh="对于 QQ/163 邮箱请输入授权码" data-placeholder-en="SMTP auth code or password">
+                                </div>
                             </div>
-
+                            <div class="email-form-row">
+                                <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 12px;">
+                                    <div>
+                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                            <span class="lang-zh">SMTP 服务器地址</span><span class="lang-en">SMTP Host Server</span>
+                                        </label>
+                                        <input type="text" id="email-smtp-host" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px;" placeholder="例如: smtp.qq.com" data-placeholder-zh="例如: smtp.qq.com" data-placeholder-en="E.g. smtp.qq.com">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                            <span class="lang-zh">端口</span><span class="lang-en">Port</span>
+                                        </label>
+                                        <input type="text" id="email-smtp-port" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px; text-align: center;" value="465">
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px; height: 100%; padding-top: 24px;">
+                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; user-select: none;">
+                                        <input type="checkbox" id="email-smtp-secure" checked style="width: 18px; height: 18px; accent-color: var(--accent-blue); cursor: pointer;">
+                                        <span>🛡️ <span class="lang-zh">安全连接 (SSL/TLS)</span><span class="lang-en">Secure Connection (SSL)</span></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <p style="font-size: 11.5px; opacity: 0.6; margin: 0; color: var(--accent-blue);">
+                                <span class="lang-zh">* 注意：QQ/163 邮箱必须在邮箱网页设置中开启 SMTP 服务并生成独立的“授权码”作为密码填入。</span>
+                                <span class="lang-en">* Note: For QQ/163 mail, you must enable SMTP and use a generated "Auth Code" as the password.</span>
+                            </p>
                         </div>
 
 
@@ -5948,28 +5987,28 @@
 
                                 <div style="display: flex; flex-direction: column; gap: 12px;">
 
-                                    <!-- Paste Data Box -->
-
-                                    <textarea id="email-recipients-paste" class="select-control" rows="4" style="font-family: monospace; font-size: 12.5px; padding: 10px 14px; width: 100%; border-radius: var(--radius-sm);" placeholder="粘贴多行数据 (CSV 逗号分隔，首行为表头)，例如:&#10;email,name,company&#10;test1@outlook.com,张三,谷歌&#10;test2@outlook.com,李四,微软" data-placeholder-zh="粘贴多行数据 (CSV 逗号分隔，首行为表头)，例如:&#10;email,name,company&#10;test1@outlook.com,张三,谷歌&#10;test2@outlook.com,李四,微软" data-placeholder-en="Paste tabular data (CSV comma-separated, first row header), e.g.:&#10;email,name,company&#10;test1@outlook.com,John,Google&#10;test2@outlook.com,Jane,Microsoft"></textarea>
-
+                                    <!-- Paste Data Box / Single Email Manual Add -->
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="text" id="email-single-recipient" class="select-control" style="flex: 1; height: 38px; border-radius: var(--radius-sm); font-size: 13px;" placeholder="手动输入单个收件人邮箱，例如 a@example.com" data-placeholder-zh="手动输入单个收件人邮箱，例如 a@example.com" data-placeholder-en="Type a single recipient email, e.g. a@example.com">
+                                            <button id="email-btn-add-single" class="btn btn-primary btn-sm" style="padding: 0 16px; height: 38px;">
+                                                <span class="lang-zh">➕ 添加</span><span class="lang-en">➕ Add</span>
+                                            </button>
+                                        </div>
+                                        <div style="text-align: center; font-size: 11px; opacity: 0.5; margin: 4px 0;">
+                                            <span class="lang-zh">— 或批量粘贴导入 —</span><span class="lang-en">— Or paste bulk list —</span>
+                                        </div>
+                                        <textarea id="email-recipients-paste" class="select-control" rows="3" style="font-family: monospace; font-size: 12.5px; padding: 10px 14px; width: 100%; border-radius: var(--radius-sm);" placeholder="粘贴多行数据（可纯邮箱列表或带表头的 CSV 数据）" data-placeholder-zh="粘贴多行数据（可纯邮箱列表或带表头的 CSV 数据）" data-placeholder-en="Paste bulk emails (either a list of emails or CSV format data)"></textarea>
+                                    </div>
                                     
-
                                     <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between;">
-
                                         <span style="font-size: 11px; opacity: 0.6;">
-
-                                            <span class="lang-zh">* 必须包含列名 'email' 或 '邮箱'。</span>
-
-                                            <span class="lang-en">* Must include an 'email' column header.</span>
-
+                                            <span class="lang-zh">* 支持自动识别纯文本邮箱列表，每行一个。</span>
+                                            <span class="lang-en">* Supports auto-recognizing single-column email lists.</span>
                                         </span>
-
                                         <button id="email-btn-parse" class="btn btn-secondary btn-sm" style="padding: 6px 14px; height: 32px;">
-
-                                            <span class="lang-zh">⚙️ 解析数据</span><span class="lang-en">⚙️ Parse Data</span>
-
+                                            <span class="lang-zh">⚙️ 批量解析</span><span class="lang-en">⚙️ Parse Bulk</span>
                                         </button>
-
                                     </div>
 
 
