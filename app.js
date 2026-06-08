@@ -2382,6 +2382,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+            } else if (target === 'email-sender') {
+
+
+
+
+
+
+
+                document.getElementById('email-sender-page').classList.add('active');
+
+
+
+
+
+
+
+                toolTitle.innerText = t("📧 邮件群发与个性化模板助手", "📧 Email Bulk Sender & Mail Merge");
+
+
+
+
+
+
+
+                toolDesc.innerText = t("本地解析表格，自定义邮件模板，通过 Outlook/Office365 邮箱平滑排队群发个性化信件", "Parse tables locally, customize templates, and queue personalized mail sendouts via Outlook/Office 365");
+
+
+
+
+
+
+
+                if (window.initEmailSender) {
+
+
+
+
+
+
+
+                    window.initEmailSender();
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
             } else {
 
 
@@ -2599,6 +2655,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
                 ipInfoNavItem.click();
+
+
+
+
+
+
+
+            }, 100);
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+    if (window.location.hash.startsWith('#email-sender')) {
+
+
+
+
+
+
+
+        const emailSenderNavItem = document.querySelector('.nav-item[data-target="email-sender"]');
+
+
+
+
+
+
+
+        if (emailSenderNavItem) {
+
+
+
+
+
+
+
+            setTimeout(() => {
+
+
+
+
+
+
+
+                emailSenderNavItem.click();
 
 
 

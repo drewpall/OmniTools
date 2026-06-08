@@ -3782,3 +3782,54 @@ body:not(.light-theme) .leaflet-container {
     }
 }
 
+
+/* ==========================================================================
+   9. EMAIL BULK SENDER DIAGNOSTIC STYLES
+   ========================================================================== */
+
+.email-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-blue);
+    cursor: pointer;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    transition: var(--transition-normal);
+}
+
+.email-tag:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+#email-preview-table th,
+#email-preview-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#email-preview-table th {
+    font-weight: 600;
+    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+#email-preview-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+#email-console::-webkit-scrollbar {
+    width: 6px;
+}
+
+#email-console::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#email-console::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
