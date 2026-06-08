@@ -3649,9 +3649,7 @@ body.lang-en .lang-zh {
     border-radius: var(--radius-sm);
 }
 
-body:not(.light-theme) .leaflet-tile-container {
-    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-}
+
 
 body:not(.light-theme) .leaflet-container {
     background: #111a2e !important;
