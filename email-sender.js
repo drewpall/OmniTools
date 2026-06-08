@@ -137,27 +137,27 @@
 
 
         // Restore custom Client ID from localStorage
-
         const defaultClientId = "cf5354e1-2db7-48f8-a3d5-e9df640003b5";
-
         const savedClientId = localStorage.getItem('email_client_id') || "";
-
         $('email-client-id-input').value = savedClientId;
 
+        // Restore SMTP credentials from localStorage
+        $('email-smtp-user').value = localStorage.getItem('email_smtp_user') || "";
+        $('email-smtp-pass').value = localStorage.getItem('email_smtp_pass') || "";
+        $('email-smtp-host').value = localStorage.getItem('email_smtp_host') || "";
+        $('email-smtp-port').value = localStorage.getItem('email_smtp_port') || "";
+        $('email-smtp-secure').checked = localStorage.getItem('email_smtp_secure') === 'true';
 
+        // Restore active mailing engine
+        const savedEngine = localStorage.getItem('email_active_engine') || "msal";
+        switchEngine(savedEngine);
 
         // Bind events
-
         bindEvents();
 
-
-
         // Initialize MSAL with active Client ID
-
         const activeClientId = savedClientId || defaultClientId;
-
         await initializeMsalInstance(activeClientId);
-
     };
 
 
@@ -390,11 +390,20 @@
         $('email-tab-msal').addEventListener('click', () => switchEngine('msal'));
         $('email-tab-smtp').addEventListener('click', () => switchEngine('smtp'));
         
-        // SMTP Form Inputs Validation
-        $('email-smtp-user').addEventListener('input', validateSmtpForm);
-        $('email-smtp-pass').addEventListener('input', validateSmtpForm);
-        $('email-smtp-host').addEventListener('input', validateSmtpForm);
-        $('email-smtp-port').addEventListener('input', validateSmtpForm);
+        // SMTP Form Inputs Validation & Persistence
+        const saveSmtpCache = () => {
+            localStorage.setItem('email_smtp_user', $('email-smtp-user').value.trim());
+            localStorage.setItem('email_smtp_pass', $('email-smtp-pass').value.trim());
+            localStorage.setItem('email_smtp_host', $('email-smtp-host').value.trim());
+            localStorage.setItem('email_smtp_port', $('email-smtp-port').value.trim());
+            localStorage.setItem('email_smtp_secure', $('email-smtp-secure').checked);
+        };
+
+        $('email-smtp-user').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
+        $('email-smtp-pass').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
+        $('email-smtp-host').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
+        $('email-smtp-port').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
+        $('email-smtp-secure').addEventListener('change', saveSmtpCache);
 
         // SMTP Auto-completion helper
         $('email-smtp-user').addEventListener('blur', (e) => {
@@ -427,6 +436,7 @@
                 }
             }
             validateSmtpForm();
+            saveSmtpCache();
         });
 
         // Clear log console
@@ -1117,6 +1127,7 @@
 
     function switchEngine(engine) {
         currentEngine = engine;
+        localStorage.setItem('email_active_engine', engine);
         const msalTab = $('email-tab-msal');
         const smtpTab = $('email-tab-smtp');
         const msalConfig = $('email-msal-config');
