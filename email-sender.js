@@ -40,9 +40,14 @@
 
 
 
-    let stats = { total: 0, pending: 0, success: 0, failed: 0 };
-
     let currentEngine = 'msal';
+
+    // SMTP Multi-account Rotation state
+    let smtpActiveAccountIndex = 0;
+    let smtpSendsCount = 0;
+
+    // Recipient Send repetitions count state
+    let recipientSendIteration = 0;
 
 
 
@@ -147,6 +152,8 @@
         $('email-smtp-host').value = localStorage.getItem('email_smtp_host') || "";
         $('email-smtp-port').value = localStorage.getItem('email_smtp_port') || "";
         $('email-smtp-secure').checked = localStorage.getItem('email_smtp_secure') === 'true';
+        $('email-smtp-rotate-mode').value = localStorage.getItem('email_smtp_rotate_mode') || "random";
+        $('email-smtp-rotate-limit').value = localStorage.getItem('email_smtp_rotate_limit') || "5";
 
         // Restore active mailing engine
         const savedEngine = localStorage.getItem('email_active_engine') || "msal";
@@ -397,6 +404,8 @@
             localStorage.setItem('email_smtp_host', $('email-smtp-host').value.trim());
             localStorage.setItem('email_smtp_port', $('email-smtp-port').value.trim());
             localStorage.setItem('email_smtp_secure', $('email-smtp-secure').checked);
+            localStorage.setItem('email_smtp_rotate_mode', $('email-smtp-rotate-mode').value);
+            localStorage.setItem('email_smtp_rotate_limit', $('email-smtp-rotate-limit').value.trim());
         };
 
         $('email-smtp-user').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
@@ -404,6 +413,8 @@
         $('email-smtp-host').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
         $('email-smtp-port').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
         $('email-smtp-secure').addEventListener('change', saveSmtpCache);
+        $('email-smtp-rotate-mode').addEventListener('change', saveSmtpCache);
+        $('email-smtp-rotate-limit').addEventListener('input', saveSmtpCache);
 
         // SMTP Auto-completion helper
         $('email-smtp-user').addEventListener('blur', (e) => {
@@ -982,24 +993,17 @@
         
 
         queueIndex = 0;
-
-        
+        smtpActiveAccountIndex = 0;
+        smtpSendsCount = 0;
+        recipientSendIteration = 0;
 
         // Reset row UI
-
         queue.forEach((_, index) => {
-
             updateTableRowStatus(index, 'ready');
-
         });
 
-
-
         stats = { total: queue.length, pending: queue.length, success: 0, failed: 0 };
-
         updateStatsCounters();
-
-
 
         $('email-btn-pause').style.display = 'none';
 
@@ -1058,7 +1062,6 @@
         }
 
         updateTableRowStatus(queueIndex, 'sending');
-        logToConsole(`[${queueIndex + 1}/${queue.length}] 📤 正在发送给: ${recipientEmail}...`);
 
         const finalSubject = renderTemplate(subjectTemplate, row);
         const finalBody = renderTemplate(bodyTemplate, row);
@@ -1080,12 +1083,52 @@
                 errMsg = err.message;
             }
         } else {
+            // Parse multi-account lists (splits by comma OR newline)
+            const rawUsers = $('email-smtp-user').value.trim();
+            const rawPasses = $('email-smtp-pass').value.trim();
+            const users = rawUsers.split(/[\n,]/).map(u => u.trim()).filter(u => u.length > 0);
+            const passes = rawPasses.split(/[\n,]/).map(p => p.trim()).filter(p => p.length > 0);
+            const maxSendsLimit = parseInt($('email-smtp-rotate-limit').value.trim(), 10) || 5;
+            const rotateMode = $('email-smtp-rotate-mode').value;
+
+            if (users.length === 0 || passes.length === 0) {
+                logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 失败: 未填写 SMTP 发信邮箱或密码，暂停队列。`);
+                pauseSending();
+                return;
+            }
+
+            // Apply rotation threshold trigger
+            if (smtpSendsCount >= maxSendsLimit && users.length > 1) {
+                if (rotateMode === 'random') {
+                    let nextIdx = smtpActiveAccountIndex;
+                    while (nextIdx === smtpActiveAccountIndex) {
+                        nextIdx = Math.floor(Math.random() * users.length);
+                    }
+                    smtpActiveAccountIndex = nextIdx;
+                } else {
+                    smtpActiveAccountIndex = (smtpActiveAccountIndex + 1) % users.length;
+                }
+                smtpSendsCount = 0;
+                logToConsole(`🔄 已达到单邮箱发信限制次数 (${maxSendsLimit} 次)，自动轮换发信账户。新发信账号: ${users[smtpActiveAccountIndex]}`);
+            }
+
+            // Fallback safe indexes
+            if (smtpActiveAccountIndex >= users.length) {
+                smtpActiveAccountIndex = 0;
+            }
+            
+            const activeUser = users[smtpActiveAccountIndex];
+            const activePass = passes[smtpActiveAccountIndex] || passes[0] || "";
+
+            const targetRepeatCount = parseInt($('email-recipient-send-count').value.trim(), 10) || 1;
+            logToConsole(`[${queueIndex + 1}/${queue.length}] 📤 正在使用发信箱: ${activeUser} 发送给: ${recipientEmail} (第 ${recipientSendIteration + 1}/${targetRepeatCount} 次)...`);
+
             const smtpConfig = {
                 smtpHost: $('email-smtp-host').value.trim(),
                 smtpPort: $('email-smtp-port').value.trim(),
                 secure: $('email-smtp-secure').checked,
-                user: $('email-smtp-user').value.trim(),
-                pass: $('email-smtp-pass').value.trim(),
+                user: activeUser,
+                pass: activePass,
                 to: recipientEmail,
                 subject: finalSubject,
                 body: finalBody,
@@ -1094,19 +1137,26 @@
             try {
                 await sendMailSMTP(smtpConfig);
                 sendSuccess = true;
+                smtpSendsCount++;
             } catch (err) {
                 errMsg = err.message;
             }
         }
 
+        const targetRepeatCount = parseInt($('email-recipient-send-count').value.trim(), 10) || 1;
+
         if (sendSuccess) {
-            logToConsole(`[${queueIndex + 1}/${queue.length}] ✅ 成功发送给 ${recipientEmail}`);
-            stats.success++;
-            stats.pending--;
-            updateStatsCounters();
-            updateTableRowStatus(queueIndex, 'success');
+            logToConsole(`[${queueIndex + 1}/${queue.length}] ✅ 成功发送给 ${recipientEmail} (次数: ${recipientSendIteration + 1}/${targetRepeatCount})`);
+            recipientSendIteration++;
             
-            queueIndex++;
+            if (recipientSendIteration >= targetRepeatCount) {
+                stats.success++;
+                stats.pending--;
+                updateStatsCounters();
+                updateTableRowStatus(queueIndex, 'success');
+                queueIndex++;
+                recipientSendIteration = 0;
+            }
 
             const baseDelay = parseInt($('email-delay-slider').value, 10) * 1000;
             const randomBias = Math.random() * 2000;
@@ -1115,12 +1165,17 @@
             sendTimer = setTimeout(processQueue, nextDelay);
         } else {
             logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 发送失败 (${recipientEmail}): ${errMsg}`);
-            stats.failed++;
-            stats.pending--;
-            updateStatsCounters();
-            updateTableRowStatus(queueIndex, 'failed');
+            recipientSendIteration++;
+
+            if (recipientSendIteration >= targetRepeatCount) {
+                stats.failed++;
+                stats.pending--;
+                updateStatsCounters();
+                updateTableRowStatus(queueIndex, 'failed');
+                queueIndex++;
+                recipientSendIteration = 0;
+            }
             
-            queueIndex++;
             sendTimer = setTimeout(processQueue, 3500);
         }
     }

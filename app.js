@@ -1550,7 +1550,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    initTheme();
+    initTheme();
+
+    // Global State Persistence for All Tool Configuration Fields
+    const persistGlobalState = () => {
+        const inputs = document.querySelectorAll('input, select, textarea');
+        inputs.forEach(el => {
+            if (!el.id || el.type === 'file' || el.type === 'password') return;
+            
+            // Read from cache
+            const cached = localStorage.getItem(`omni_state_${el.id}`);
+            if (cached !== null) {
+                if (el.type === 'checkbox') {
+                    el.checked = cached === 'true';
+                } else if (el.type === 'radio') {
+                    el.checked = el.value === cached;
+                } else {
+                    el.value = cached;
+                }
+                // Trigger native input/change events to update component UI states
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            // Listen for changes to save cache
+            const saveHandler = () => {
+                const val = el.type === 'checkbox' ? el.checked.toString() : el.value;
+                localStorage.setItem(`omni_state_${el.id}`, val);
+            };
+            el.addEventListener('input', saveHandler);
+            el.addEventListener('change', saveHandler);
+        });
+    };
+    // Wait a slight delay to ensure dynamic tool script components have bound their listeners first
+    setTimeout(persistGlobalState, 300);
 
 
 
