@@ -101,21 +101,14 @@
 
 
     <!-- IP Info Logic -->
-
     <script src="ip-info.js?v=1.0.0" defer></script>
-
     <!-- MSAL Browser SDK for Microsoft Graph API -->
-
     <script src="https://alcdn.msauth.net/browser/msal-browser/3.13.0/js/msal-browser.min.js" defer></script>
 
-
-
     <!-- Email Sender Logic -->
-
     <script src="email-sender.js?v=1.0.0" defer></script>
-
-
-
+    <!-- iOS IPA Signer Logic -->
+    <script src="ipa-signer.js?v=1.0.0" defer></script>
 </head>
 
 <body>
@@ -277,6 +270,20 @@
                         <span class="lang-zh">邮件群发助手</span>
 
                         <span class="lang-en">Email Sender</span>
+
+                    </span>
+
+                </a>
+
+                <a href="#" class="nav-item" data-target="ipa-signer">
+
+                    <span class="nav-icon">🛡️</span>
+
+                    <span class="nav-label">
+
+                        <span class="lang-zh">iOS 在线签名</span>
+
+                        <span class="lang-en">iOS IPA Signer</span>
 
                     </span>
 
@@ -6345,7 +6352,562 @@
 
                 </div>
 
+                <!-- Tool Page 10: iOS IPA Signer -->
 
+                <div id="ipa-signer-page" class="tool-page">
+
+                    <div class="ipa-tabs">
+                        <button class="ipa-tab-btn active" id="tab-ipa-sign-btn">
+                            <span class="lang-zh">🔐 签名并安装</span><span class="lang-en">Sign & Install</span>
+                        </button>
+                        <button class="ipa-tab-btn" id="tab-ipa-direct-btn">
+                            <span class="lang-zh">📲 直接安装 (免签名)</span><span class="lang-en">Direct Install (No Sign)</span>
+                        </button>
+                    </div>
+
+                    <div class="control-panel-grid" id="ipa-sign-section">
+
+                        <!-- Left Panel: Certificates & Credentials -->
+
+                        <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 20px;">
+
+                            <div class="card-header">
+
+                                <h3>🔑 <span class="lang-zh">签名证书与凭证</span><span class="lang-en">Signing Certificates</span></h3>
+
+                            </div>
+
+                            <!-- P12 File Input -->
+
+                            <div class="config-group">
+
+                                <label class="config-title">
+
+                                    <span class="lang-zh">P12 证书文件 (.p12)</span>
+
+                                    <span class="lang-en">P12 Certificate (.p12)</span>
+
+                                </label>
+
+                                <div class="file-uploader-box" id="p12-upload-box" style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.01); transition: all 0.3s;">
+
+                                    <input type="file" id="ipa-p12-input" accept=".p12" style="display: none;">
+
+                                    <div class="upload-icon" style="font-size: 24px; margin-bottom: 8px;">🔐</div>
+
+                                    <span class="upload-label-text" style="font-size: 13px; color: var(--text-secondary);">
+
+                                        <span class="lang-zh">点击或拖入 P12 证书</span>
+
+                                        <span class="lang-en">Click or drag P12 certificate</span>
+
+                                    </span>
+
+                                </div>
+
+                                <div id="p12-file-info" class="file-info-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; color: #10B981; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <span class="file-name-text"></span>
+
+                                    <button class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+
+                                </div>
+
+                            </div>
+
+                            <!-- P12 Password -->
+
+                            <div class="config-group">
+
+                                <label class="config-title">
+
+                                    <span class="lang-zh">证书密码</span>
+
+                                    <span class="lang-en">Certificate Password</span>
+
+                                </label>
+
+                                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+
+                                    <input type="password" id="ipa-password-input" class="text-control" placeholder="输入 P12 证书密码" data-placeholder-zh="输入 P12 证书密码" data-placeholder-en="Enter P12 certificate password" style="width: 100%; padding-right: 40px; height: 40px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);">
+
+                                    <button type="button" id="ipa-password-toggle" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px;">👁️</button>
+
+                                </div>
+
+                            </div>
+
+                            <!-- MobileProvision Input -->
+
+                            <div class="config-group">
+
+                                <label class="config-title">
+
+                                    <span class="lang-zh">描述文件 (.mobileprovision)</span>
+
+                                    <span class="lang-en">Provisioning Profile (.mobileprovision)</span>
+
+                                </label>
+
+                                <div class="file-uploader-box" id="prov-upload-box" style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.01); transition: all 0.3s;">
+
+                                    <input type="file" id="ipa-prov-input" accept=".mobileprovision" style="display: none;">
+
+                                    <div class="upload-icon" style="font-size: 24px; margin-bottom: 8px;">📄</div>
+
+                                    <span class="upload-label-text" style="font-size: 13px; color: var(--text-secondary);">
+
+                                        <span class="lang-zh">点击或拖入描述文件</span>
+
+                                        <span class="lang-en">Click or drag mobileprovision</span>
+
+                                    </span>
+
+                                </div>
+
+                                <div id="prov-file-info" class="file-info-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; color: #10B981; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <span class="file-name-text"></span>
+
+                                    <button class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+
+                                </div>
+
+                            </div>
+
+                            <!-- Entitlements.plist Input (Optional) -->
+
+                            <div class="config-group">
+
+                                <label class="config-title">
+
+                                    <span class="lang-zh">自定义权限 (可选 .plist)</span>
+
+                                    <span class="lang-en">Custom Entitlements (Optional .plist)</span>
+
+                                </label>
+
+                                <div class="file-uploader-box" id="ent-upload-box" style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.01); transition: all 0.3s;">
+
+                                    <input type="file" id="ipa-ent-input" accept=".plist" style="display: none;">
+
+                                    <div class="upload-icon" style="font-size: 24px; margin-bottom: 8px;">🛠️</div>
+
+                                    <span class="upload-label-text" style="font-size: 13px; color: var(--text-secondary);">
+
+                                        <span class="lang-zh">点击或拖入 plist 文件</span>
+
+                                        <span class="lang-en">Click or drag plist file</span>
+
+                                    </span>
+
+                                </div>
+
+                                <div id="ent-file-info" class="file-info-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; color: #10B981; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <span class="file-name-text"></span>
+
+                                    <button class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <!-- Right Panel: IPA Upload & Options -->
+
+                        <div class="workspace-card config-card" style="display: flex; flex-direction: column; gap: 20px;">
+
+                            <div class="card-header">
+
+                                <h3>📦 <span class="lang-zh">IPA 应用程序与设置</span><span class="lang-en">IPA Application & Settings</span></h3>
+
+                            </div>
+
+                            <!-- IPA File Input -->
+
+                            <div class="config-group">
+
+                                <label class="config-title">
+
+                                    <span class="lang-zh">IPA 软件包 (.ipa)</span>
+
+                                    <span class="lang-en">IPA Package File (.ipa)</span>
+
+                                </label>
+
+                                <div class="file-uploader-box" id="ipa-upload-box" style="border: 2px dashed var(--primary-light); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.02); transition: all 0.3s; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+
+                                    <input type="file" id="ipa-file-input" accept=".ipa" style="display: none;">
+
+                                    <div class="upload-icon" style="font-size: 32px; margin-bottom: 8px;">📱</div>
+
+                                    <span class="upload-label-text" style="font-size: 14px; font-weight: 500; color: var(--text-primary);">
+
+                                        <span class="lang-zh">拖入您的 IPA 软件包 或 点击浏览</span>
+
+                                        <span class="lang-en">Drag your IPA package here or browse</span>
+
+                                    </span>
+
+                                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">支持最大 1.5GB 软件包</p>
+
+                                </div>
+
+                                <div id="ipa-file-info" class="file-info-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; color: #10B981; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+
+                                    <span class="file-name-text"></span>
+
+                                    <button class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+
+                                </div>
+
+                            </div>
+
+                            <!-- Overrides Accordion -->
+
+                            <div class="config-section" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px;">
+
+                                <div id="ipa-settings-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+
+                                    <h4 style="margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary);">🛠️ <span class="lang-zh">高级修改选项 (可选)</span><span class="lang-en">Advanced Modification Options (Optional)</span></h4>
+
+                                    <span id="ipa-settings-arrow" style="transition: transform 0.3s;">▼</span>
+
+                                </div>
+
+                                <div id="ipa-settings-content" style="display: none; margin-top: 12px; flex-direction: column; gap: 12px;">
+
+                                    <!-- Custom Icon Uploader -->
+                                    <div class="config-group">
+                                        <label class="config-title" style="font-size: 12px;">
+                                            <span class="lang-zh">更换应用图标</span>
+                                            <span class="lang-en">Replace App Icon</span>
+                                        </label>
+                                        <div class="file-uploader-box" id="icon-upload-box" style="border: 1px dashed var(--border-color); border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.01); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;">
+                                            <input type="file" id="ipa-icon-input" accept="image/png, image/jpeg" style="display: none;">
+                                            <div id="icon-preview-container" style="display: none; align-items: center; gap: 10px;">
+                                                <img id="icon-preview-img" style="width: 28px; height: 28px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color);">
+                                                <span id="icon-preview-name" style="font-size: 11px; color: var(--text-secondary); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                            </div>
+                                            <div id="icon-upload-placeholder" style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="font-size: 16px;">🖼️</span>
+                                                <span style="font-size: 12px; color: var(--text-secondary);">
+                                                    <span class="lang-zh">点击或拖入新图标 (PNG/JPG)</span>
+                                                    <span class="lang-en">Click or drag new icon (PNG/JPG)</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div id="icon-file-info" style="display: none; justify-content: flex-end; margin-top: 4px;">
+                                            <button type="button" id="btn-clear-icon" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 11px; padding: 2px 6px;">✕ <span class="lang-zh">清除图标</span><span class="lang-en">Clear</span></button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dylib Injector -->
+                                    <div class="config-group">
+                                        <label class="config-title" style="font-size: 12px;">
+                                            <span class="lang-zh">注入动态库 (.dylib)</span>
+                                            <span class="lang-en">Inject Dynamic Library (.dylib)</span>
+                                        </label>
+                                        <div class="file-uploader-box" id="dylib-upload-box" style="border: 1px dashed var(--border-color); border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.01); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;">
+                                            <input type="file" id="ipa-dylib-input" accept=".dylib" style="display: none;">
+                                            <div id="dylib-file-info" style="display: none; align-items: center; gap: 8px; justify-content: space-between; width: 100%;">
+                                                <span class="file-name-text" style="font-size: 11px; color: var(--primary-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;"></span>
+                                                <button type="button" class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+                                            </div>
+                                            <div id="dylib-upload-placeholder" style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="font-size: 16px;">💉</span>
+                                                <span style="font-size: 12px; color: var(--text-secondary);">
+                                                    <span class="lang-zh">点击或拖入插件 .dylib 文件</span>
+                                                    <span class="lang-en">Click or drag plugin .dylib file</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="config-group">
+
+                                        <label class="config-title" style="font-size: 12px;"><span class="lang-zh">新 Bundle ID</span><span class="lang-en">New Bundle ID</span></label>
+
+                                        <input type="text" id="ipa-new-bundleid" class="text-control" placeholder="e.g. com.custom.app" style="height: 36px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+
+                                    </div>
+
+                                    <div class="config-group">
+
+                                        <label class="config-title" style="font-size: 12px;"><span class="lang-zh">新应用名称</span><span class="lang-en">New Display Name</span></label>
+
+                                        <input type="text" id="ipa-new-name" class="text-control" placeholder="e.g. 我的定制应用" style="height: 36px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+
+                                    </div>
+
+                                    <div class="config-group">
+
+                                        <label class="config-title" style="font-size: 12px;"><span class="lang-zh">新应用版本</span><span class="lang-en">New Version</span></label>
+
+                                        <input type="text" id="ipa-new-version" class="text-control" placeholder="e.g. 1.0.0" style="height: 36px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+
+                                    </div>
+
+                                    <div class="config-group">
+                                        <label class="config-title" style="font-size: 12px;">
+                                            <span class="lang-zh">最低 iOS 系统版本限制</span>
+                                            <span class="lang-en">Minimum iOS Version</span>
+                                        </label>
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="text" id="ipa-new-min-os" class="text-control" placeholder="e.g. 12.0" style="flex: 1; height: 36px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px;">
+                                            <button type="button" id="btn-ipa-bypass-min-os" class="btn btn-secondary" style="padding: 0 12px; height: 36px; font-size: 11px; border-color: rgba(255,255,255,0.1); white-space: nowrap;">
+                                                <span class="lang-zh">降级至 12.0</span>
+                                                <span class="lang-en">Bypass (12.0)</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="config-group" style="margin-top: 4px; display: flex; flex-direction: column; gap: 8px;">
+                                        <label class="config-title" style="font-size: 12px; margin-bottom: 2px;">
+                                            <span class="lang-zh">应用参数与功能调整</span>
+                                            <span class="lang-en">App Parameters & Features</span>
+                                            <span id="ipa-plist-status-badge" style="margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #EF4444; font-weight: normal; display: inline-block;">未连接本地服务</span>
+                                        </label>
+                                        
+                                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                                            <label class="checkbox-container" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; user-select: none;">
+                                                <input type="checkbox" id="ipa-opt-fileshare" style="width: 14px; height: 14px; accent-color: var(--primary-light); margin-top: 2px;">
+                                                <span>
+                                                    <strong class="lang-zh" style="display: block; font-weight: 600; color: var(--text-primary);">开启 iTunes 文件共享</strong><strong class="lang-en" style="display: block; font-weight: 600; color: var(--text-primary);">Enable File Sharing</strong>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-zh">允许通过 iTunes/文件 App 直接与电脑传输文件</span>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-en">Allows transferring files via Files App / iTunes sharing</span>
+                                                </span>
+                                            </label>
+
+                                            <label class="checkbox-container" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; user-select: none;">
+                                                <input type="checkbox" id="ipa-opt-openinplace" style="width: 14px; height: 14px; accent-color: var(--primary-light); margin-top: 2px;">
+                                                <span>
+                                                    <strong class="lang-zh" style="display: block; font-weight: 600; color: var(--text-primary);">支持应用内打开文档</strong><strong class="lang-en" style="display: block; font-weight: 600; color: var(--text-primary);">Supports Document Opening</strong>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-zh">允许应用直接修改并保存外部源文件</span>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-en">Allows opening and editing files directly in-place</span>
+                                                </span>
+                                            </label>
+
+                                            <label class="checkbox-container" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; user-select: none;">
+                                                <input type="checkbox" id="ipa-opt-http" style="width: 14px; height: 14px; accent-color: var(--primary-light); margin-top: 2px;">
+                                                <span>
+                                                    <strong class="lang-zh" style="display: block; font-weight: 600; color: var(--text-primary);">允许 HTTP 不安全连接</strong><strong class="lang-en" style="display: block; font-weight: 600; color: var(--text-primary);">Allow HTTP Traffic</strong>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-zh">解除苹果强制 HTTPS 限制，支持内网 HTTP 接口</span>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-en">Bypass mandatory Apple HTTPS requirements</span>
+                                                </span>
+                                            </label>
+
+                                            <label class="checkbox-container" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; user-select: none;">
+                                                <input type="checkbox" id="ipa-opt-nodevicecaps" style="width: 14px; height: 14px; accent-color: var(--primary-light); margin-top: 2px;">
+                                                <span>
+                                                    <strong class="lang-zh" style="display: block; font-weight: 600; color: var(--text-primary);">解除设备安装型号限制</strong><strong class="lang-en" style="display: block; font-weight: 600; color: var(--text-primary);">Remove Device Constraints</strong>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-zh">清除设备型号与通话特定限制，方便在 iPad/旧机上安装</span>
+                                                    <span style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;" class="lang-en">Remove UIRequiredDeviceCapabilities restriction</span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <!-- Start Button & Status -->
+
+                            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px;">
+
+                                <button id="btn-ipa-sign" class="btn btn-primary btn-large glow-btn" style="width: 100%; min-height: 50px;">
+
+                                    <span class="btn-text">⚡ <span class="lang-zh">开始本地签名</span><span class="lang-en">Start Local Signing</span></span>
+
+                                </button>
+
+                                <div style="display: flex; gap: 10px; width: 100%;">
+                                    <button id="btn-ipa-save-export" class="btn btn-secondary" style="flex: 1; min-height: 38px; display: none;">
+                                        <span>⚙️ <span class="lang-zh">保存修改并导出</span><span class="lang-en">Save & Export</span></span>
+                                    </button>
+                                    <button id="btn-ipa-reset" class="btn btn-secondary" style="flex: 1; min-height: 38px; display: none;">
+                                        <span><span class="lang-zh">重置</span><span class="lang-en">Reset</span></span>
+                                    </button>
+                                </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- Direct Install Section -->
+                    <div class="control-panel-grid" id="ipa-direct-section" style="display: none;">
+
+                        <!-- Left Panel: IPA File Dropzone -->
+                        <div class="workspace-card details-card" style="display: flex; flex-direction: column; gap: 20px;">
+
+                            <div class="card-header">
+                                <h3>📦 <span class="lang-zh">导入 IPA 软件包</span><span class="lang-en">Import IPA Package</span></h3>
+                            </div>
+
+                            <div class="config-group">
+                                <label class="config-title">
+                                    <span class="lang-zh">选择免签 IPA 文件 (.ipa)</span>
+                                    <span class="lang-en">Select Unsigned IPA (.ipa)</span>
+                                </label>
+                                <div class="file-uploader-box" id="ipa-direct-upload-box" style="border: 2px dashed var(--primary-light); border-radius: 8px; padding: 32px 16px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.02); transition: all 0.3s; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                                    <input type="file" id="ipa-direct-file-input" accept=".ipa" style="display: none;">
+                                    <div class="upload-icon" style="font-size: 32px; margin-bottom: 8px;">📱</div>
+                                    <span class="upload-label-text" style="font-size: 14px; font-weight: 500; color: var(--text-primary);">
+                                        <span class="lang-zh">拖入您的 IPA 软件包 或 点击浏览</span>
+                                        <span class="lang-en">Drag your IPA package here or browse</span>
+                                    </span>
+                                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">本模式仅支持已签名或免签的 IPA (不进行代码签名)</p>
+                                </div>
+                                <div id="ipa-direct-file-info" class="file-info-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; color: #10B981; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <span class="file-name-text"></span>
+                                    <button class="btn-clear-file" style="background: none; border: none; color: #EF4444; cursor: pointer; font-size: 14px;">✕</button>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Right Panel: App Details & Actions -->
+                        <div class="workspace-card config-card" style="display: flex; flex-direction: column; gap: 20px;">
+
+                            <div class="card-header">
+                                <h3>⚙️ <span class="lang-zh">应用信息与安装配置</span><span class="lang-en">App Info & Install Config</span></h3>
+                            </div>
+
+                    <!-- File Explorer Panel -->
+                    <div id="ipa-explorer-panel" class="workspace-card" style="display: none; margin-top: 24px;">
+                        <div class="card-header" style="margin-bottom: 12px;">
+                            <h3>📂 <span class="lang-zh">IPA 内部文件管理 (可选)</span><span class="lang-en">IPA File Explorer (Optional)</span></h3>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4;">
+                            <span class="lang-zh">🔍 在此处查看、下载或删除 IPA 内部的核心配置文件与动态库组件。修改保存在网页内存中，点击下方“开始本地签名”后生效。</span>
+                            <span class="lang-en">🔍 View, download, or delete core configuration files and dynamic libraries inside the IPA bundle. Changes are applied in-memory and committed when you click "Start Local Signing".</span>
+                        </p>
+                        <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.15);">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.02);">
+                                        <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);"><span class="lang-zh">文件路径</span><span class="lang-en">File Path</span></th>
+                                        <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); width: 100px;"><span class="lang-zh">大小</span><span class="lang-en">Size</span></th>
+                                        <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); width: 120px; text-align: center;"><span class="lang-zh">操作</span><span class="lang-en">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ipa-explorer-tbody">
+                                    <!-- Dynamic injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                            <div class="config-group">
+                                <label class="config-title">
+                                    <span class="lang-zh">应用名称 (必填)</span>
+                                    <span class="lang-en">App Name (Required)</span>
+                                </label>
+                                <input type="text" id="ipa-direct-name" class="text-control" placeholder="例如：我的应用" style="height: 40px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); padding: 0 12px;">
+                            </div>
+
+                            <div class="config-group">
+                                <label class="config-title">
+                                    <span class="lang-zh">Bundle ID (必填)</span>
+                                    <span class="lang-en">Bundle ID (Required)</span>
+                                </label>
+                                <input type="text" id="ipa-direct-bundleid" class="text-control" placeholder="例如：com.custom.app" style="height: 40px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); padding: 0 12px;">
+                            </div>
+
+                            <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px;">
+                                <button id="btn-ipa-direct-install" class="btn btn-primary btn-large glow-btn" style="width: 100%; min-height: 50px;">
+                                    <span class="btn-text">⚡ <span class="lang-zh">一键无线安装</span><span class="lang-en">Wireless Install</span></span>
+                                </button>
+                                <div id="ipa-direct-install-tip" style="font-size: 11px; color: var(--text-secondary); line-height: 1.4; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <span class="lang-zh">💡 提示：该安装方式将 IPA 文件上传至您本机的本地服务器，并通过 ITMS 协议分发至局域网内的 iPhone。免签 IPA 需要设备具备相应安装权限（如企业包、已绑定您设备 UDID 的包、或越狱/巨魔设备）。</span>
+                                    <span class="lang-en">💡 Tip: This will upload the IPA to your local machine's server and distribute it to your iPhone via ITMS protocol. Unsigned IPA installation requires device compatibility (e.g., Enterprise certificate, UDID registered, or TrollStore/Jailbreak).</span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- Progress/Status Panel -->
+
+                    <div id="ipa-progress-panel" class="workspace-card progress-card" style="display: none; margin-top: 24px;">
+
+                        <div class="progress-container">
+
+                            <div class="progress-circular-wrapper">
+
+                                <svg class="progress-ring" width="160" height="160">
+
+                                    <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.05)" stroke-width="8" fill="transparent" r="70" cx="80" cy="80" />
+
+                                    <circle id="ipa-progress-indicator-circle" class="progress-ring-fill" stroke="url(#ipa-progress-gradient)" stroke-width="8" stroke-dasharray="439.8" stroke-dashoffset="439.8" stroke-linecap="round" fill="transparent" r="70" cx="80" cy="80" />
+
+                                    <defs>
+
+                                        <linearGradient id="ipa-progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+
+                                            <stop offset="0%" stop-color="var(--primary-light)" />
+
+                                            <stop offset="100%" stop-color="var(--accent-blue)" />
+
+                                        </linearGradient>
+
+                                    </defs>
+
+                                </svg>
+
+                                <div class="progress-percentage-display" id="ipa-progress-display">0%</div>
+
+                            </div>
+
+                            <div class="progress-text-block">
+
+                                <h3 id="ipa-progress-status-title"><span class="lang-zh">正在准备中...</span><span class="lang-en">Preparing...</span></h3>
+
+                                <p id="ipa-progress-status-desc"><span class="lang-zh">正在读取上传的文件...</span><span class="lang-en">Reading uploaded files...</span></p>
+
+                            </div>
+
+                            <div id="ipa-install-options" class="ipa-install-options" style="display: none; margin-top: 15px; width: 100%; text-align: center;">
+
+                                <button id="btn-ipa-wifi-install" class="btn btn-success btn-large" style="width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+
+                                    <span>📲 <span class="lang-zh">一键无线安装 (本地局域网/隧道)</span><span class="lang-en">Wireless Install (Local/Tunnel)</span></span>
+
+                                </button>
+
+                                <div id="ipa-wifi-install-tip" style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; line-height: 1.4; text-align: left; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-color);">
+
+                                    <span class="lang-zh">⚠️ 注意：系统安装弹窗调用需要您使用 HTTPS 协议访问本站（例如通过 ngrok 隧道）。请确保您的 iPhone 与电脑在同一局域网下，或通过公网隧道访问。</span>
+
+                                    <span class="lang-en">⚠️ Note: Invoking the system installation popup requires you to access this site via HTTPS (e.g., via ngrok tunnel). Make sure your iPhone is on the same network or connected via tunnel.</span>
+
+                                </div>
+
+                            </div>
+
+                            <!-- Live console log output for detail signing logs -->
+
+                            <div class="progress-log-box" style="margin-top: 20px; width: 100%;">
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+
+                                    <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-secondary);">💻 <span class="lang-zh">实时控制台日志</span><span class="lang-en">Live Console Logging</span></h4>
+
+                                </div>
+
+                                <div id="ipa-console" style="width: 100%; height: 180px; background: #080d1a; border-radius: 8px; border: 1px solid var(--border-color); font-family: monospace; font-size: 11px; color: #34D399; padding: 12px 16px; overflow-y: auto; text-align: left; line-height: 1.6; white-space: pre-wrap; word-break: break-all; box-shadow: inset 0 0 12px rgba(0,0,0,0.8);">Waiting for signing to start...</div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
 
                 <!-- Tool Page Placeholder: Coming Soon -->
 

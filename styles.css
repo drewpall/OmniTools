@@ -3877,3 +3877,114 @@ body:not(.light-theme) .leaflet-container {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ==========================================================================
+   10. iOS IPA Signer Styles
+   ========================================================================== */
+
+#ipa-signer-page .file-uploader-box:hover {
+    border-color: var(--primary-light) !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.1);
+}
+
+#ipa-signer-page .file-uploader-box.dragover {
+    border-color: var(--primary-light) !important;
+    background-color: rgba(139, 92, 246, 0.08) !important;
+    box-shadow: 0 0 18px rgba(139, 92, 246, 0.2);
+}
+
+#ipa-signer-page .file-info-badge {
+    transition: all 0.3s ease;
+    animation: slideDown 0.2s ease-out;
+}
+
+#ipa-signer-page .text-control {
+    transition: border-color 0.2s ease;
+}
+
+#ipa-signer-page .text-control:focus {
+    border-color: var(--primary-light) !important;
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.2);
+    outline: none;
+}
+
+#ipa-signer-page .progress-percentage-display {
+    position: absolute;
+    font-family: 'Outfit', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Premium Tabs for IPA Signer */
+.ipa-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    border-radius: 12px;
+    width: fit-content;
+}
+
+body.light-theme .ipa-tabs {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.ipa-tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ipa-tab-btn:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+body.light-theme .ipa-tab-btn:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.ipa-tab-btn.active {
+    background: var(--primary-gradient);
+    color: #ffffff !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+}
+
+/* Install options & success button */
+.ipa-install-options {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+.btn-success:hover {
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4) !important;
+}
+
+/* Plist Editor styles */
+.plist-disabled {
+    opacity: 0.4;
+    pointer-events: none !important;
+    user-select: none !important;
+}

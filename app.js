@@ -2471,14 +2471,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            } else {
-
-
-
-
-
-
-
+            } else if (target === 'ipa-signer') {
+
+                document.getElementById('ipa-signer-page').classList.add('active');
+
+                toolTitle.innerText = t("🛡️ iOS 在线签名", "🛡️ iOS IPA Signer");
+
+                toolDesc.innerText = t("纯浏览器本地 WebAssembly 签名 iOS App 软件包，无需上传，100% 隐私安全", "Sign iOS App packages locally using WebAssembly in your browser, 100% private and secure without uploads");
+
+                if (window.initIpaSigner) {
+
+                    window.initIpaSigner();
+
+                }
+
+            } else {
+
                 // video-compressor
 
 
