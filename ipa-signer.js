@@ -1429,9 +1429,10 @@
         const input = document.getElementById('ipa-dylib-input');
         const info = document.getElementById('dylib-file-info');
         const placeholder = document.getElementById('dylib-upload-placeholder');
-        const clearBtn = info.querySelector('.btn-clear-file');
 
         if (!box || !input || !info) return;
+
+        const clearBtn = info.querySelector('.btn-clear-file');
 
         box.addEventListener('click', () => {
             input.click();
@@ -1494,11 +1495,12 @@
 
     // Global initializer called on page load or routing switch
     window.initIpaSigner = function () {
-        // Setup all dropzones
-        setupDropzone('p12-upload-box', 'ipa-p12-input', 'p12-file-info', '.p12', 'p12');
-        setupDropzone('prov-upload-box', 'ipa-prov-input', 'prov-file-info', '.mobileprovision', 'prov');
-        setupDropzone('ent-upload-box', 'ipa-ent-input', 'ent-file-info', '.plist', 'ent');
-        setupDropzone('ipa-upload-box', 'ipa-file-input', 'ipa-file-info', '.ipa', 'ipa');
+        try {
+            // Setup all dropzones
+            setupDropzone('p12-upload-box', 'ipa-p12-input', 'p12-file-info', '.p12', 'p12');
+            setupDropzone('prov-upload-box', 'ipa-prov-input', 'prov-file-info', '.mobileprovision', 'prov');
+            setupDropzone('ent-upload-box', 'ipa-ent-input', 'ent-file-info', '.plist', 'ent');
+            setupDropzone('ipa-upload-box', 'ipa-file-input', 'ipa-file-info', '.ipa', 'ipa');
 
         // Setup direct install dropzone, icon uploader, dylib uploader, & tabs
         setupDirectDropzone();
@@ -1602,5 +1604,9 @@
 
         // Check companion server connection
         checkCompanionServer().catch(() => {});
+        } catch (initErr) {
+            console.error("Error during initIpaSigner:", initErr);
+            logToConsole(`[INIT ERROR] Initialization failed: ${initErr.message}`);
+        }
     };
 })();
