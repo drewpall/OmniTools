@@ -10,6 +10,7 @@ class CrossOriginIsolationHandler(http.server.SimpleHTTPRequestHandler):
         # Inject the COOP/COEP headers to unlock SharedArrayBuffer (multi-threading)
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         super().end_headers()
 

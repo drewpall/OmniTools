@@ -46,6 +46,7 @@ if (typeof window === 'undefined') {
                     if (!coepCredentialless) {
                         newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
                     }
+                    newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
 
                     return new Response(response.body, {
                         status: response.status,
