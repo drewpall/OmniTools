@@ -5861,64 +5861,113 @@
 
                         <!-- Generic SMTP Config Container -->
                         <div id="email-smtp-config" style="display: none; flex-direction: column; gap: 14px;">
-                            <div class="email-form-row">
-                                <div>
-                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
-                                        <span class="lang-zh">发信邮箱列表 (一行一个发信账号，或用英文逗号分隔)</span><span class="lang-en">Sender Email Address List (One per line or comma-separated)</span>
-                                    </label>
-                                    <textarea id="email-smtp-user" class="select-control" style="width: 100%; height: 70px; padding: 8px 14px; font-family: monospace; font-size: 12.5px; line-height: 1.4;" placeholder="例如:&#10;aaa@163.com&#10;bbb@qq.com" data-placeholder-zh="例如:&#10;aaa@163.com&#10;bbb@qq.com" data-placeholder-en="E.g.&#10;aaa@163.com&#10;bbb@qq.com"></textarea>
-                                </div>
-                                <div>
-                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
-                                        <span class="lang-zh">邮箱 SMTP 授权码 / 密码 (与发信箱顺序对应，一行一个)</span><span class="lang-en">SMTP Password / Auth Code List (One per line respectively)</span>
-                                    </label>
-                                    <textarea id="email-smtp-pass" class="select-control" style="width: 100%; height: 70px; padding: 8px 14px; font-family: monospace; font-size: 12.5px; line-height: 1.4;" placeholder="例如:&#10;pass1&#10;pass2" data-placeholder-zh="例如:&#10;pass1&#10;pass2" data-placeholder-en="E.g.&#10;authcode1&#10;authcode2"></textarea>
-                                </div>
+                            <!-- Sender Accounts Control Tabs -->
+                            <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                <button type="button" id="email-smtp-tab-single" class="btn active" style="padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; background: var(--border-color); color: var(--text-primary); border: none;">
+                                    <span class="lang-zh">单个手动添加</span><span class="lang-en">Add Single</span>
+                                </button>
+                                <button type="button" id="email-smtp-tab-bulk" class="btn" style="padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; background: transparent; color: var(--text-primary); border: 1px solid var(--border-color);">
+                                    <span class="lang-zh">批量导入/一键识别</span><span class="lang-en">Bulk Import</span>
+                                </button>
                             </div>
-                            <div class="email-form-row">
-                                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+
+                            <!-- Single Account Add Form -->
+                            <div id="email-smtp-single-form" style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="email-form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                     <div>
-                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
-                                            <span class="lang-zh">SMTP 服务器地址</span><span class="lang-en">SMTP Host Server</span>
+                                        <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.8;">
+                                            <span class="lang-zh">发信邮箱</span><span class="lang-en">Sender Email</span>
                                         </label>
-                                        <input type="text" id="email-smtp-host" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px;" placeholder="例如: smtp.163.com" data-placeholder-zh="例如: smtp.163.com" data-placeholder-en="E.g. smtp.163.com">
+                                        <input type="email" id="email-smtp-single-user" class="select-control" style="width: 100%; height: 34px; padding: 6px 10px; font-size: 12px;" placeholder="例如: test@163.com">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                        <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.8;">
+                                            <span class="lang-zh">密码/授权码</span><span class="lang-en">SMTP Password</span>
+                                        </label>
+                                        <input type="password" id="email-smtp-single-pass" class="select-control" style="width: 100%; height: 34px; padding: 6px 10px; font-size: 12px;" placeholder="SMTP 授权码/密码">
+                                    </div>
+                                </div>
+                                <div class="email-form-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: end;">
+                                    <div>
+                                        <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.8;">
+                                            <span class="lang-zh">SMTP 服务器</span><span class="lang-en">SMTP Host</span>
+                                        </label>
+                                        <input type="text" id="email-smtp-single-host" class="select-control" style="width: 100%; height: 34px; padding: 6px 10px; font-size: 12px;" placeholder="自动识别或填写，如 smtp.163.com">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.8;">
                                             <span class="lang-zh">端口</span><span class="lang-en">Port</span>
                                         </label>
-                                        <input type="text" id="email-smtp-port" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px; text-align: center;" value="465">
+                                        <input type="text" id="email-smtp-single-port" class="select-control" style="width: 100%; height: 34px; padding: 6px 10px; text-align: center; font-size: 12px;" value="465">
+                                    </div>
+                                    <div style="display: flex; align-items: center; height: 34px; padding-bottom: 2px;">
+                                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; user-select: none;">
+                                            <input type="checkbox" id="email-smtp-single-secure" checked style="width: 16px; height: 16px; accent-color: var(--accent-blue); cursor: pointer;">
+                                            <span>SSL</span>
+                                        </label>
                                     </div>
                                 </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                    <div>
-                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
-                                            <span class="lang-zh">切换发信邮箱模式</span><span class="lang-en">Rotation Mode</span>
-                                        </label>
-                                        <select id="email-smtp-rotate-mode" class="select-control" style="width: 100%; height: 38px; padding: 8px 12px;">
-                                            <option value="random">🎲 随机切换 / Random</option>
-                                            <option value="sequential">🔁 顺序切换 / Sequential</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
-                                            <span class="lang-zh">每个邮箱最大发信次数</span><span class="lang-en">Max Sends Per Mail</span>
-                                        </label>
-                                        <input type="number" id="email-smtp-rotate-limit" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px; text-align: center;" value="5" min="1">
+                                <button type="button" id="email-smtp-btn-add-single" class="btn btn-primary" style="height: 34px; font-size: 12.5px; width: 100%;">
+                                    <span class="lang-zh">➕ 添加该发信账号</span><span class="lang-en">➕ Add Account</span>
+                                </button>
+                            </div>
+
+                            <!-- Bulk Account Import Form -->
+                            <div id="email-smtp-bulk-form" style="display: none; flex-direction: column; gap: 10px;">
+                                <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.8;">
+                                    <span class="lang-zh">批量发信邮箱文本 (支持以下格式之一，每行一个账号)</span>
+                                    <span class="lang-en">Bulk Accounts Text (One per line)</span>
+                                </label>
+                                <p style="font-size: 11px; opacity: 0.6; margin: 0;">
+                                    <span class="lang-zh">格式：邮箱----密码 或 邮箱----密码----服务器----端口----SSL(0/1)；也支持空格/逗号/分号/Tab分隔。</span>
+                                    <span class="lang-en">Format: email----password OR email----password----host----port----ssl(0/1)</span>
+                                </p>
+                                <textarea id="email-smtp-bulk-input" class="select-control" style="width: 100%; height: 90px; padding: 8px; font-family: monospace; font-size: 12px; line-height: 1.4;" placeholder="例如:&#10;user1@163.com----pass1&#10;user2@qq.com----pass2----smtp.qq.com----465----1" data-placeholder-zh="例如:&#10;user1@163.com----pass1&#10;user2@qq.com----pass2----smtp.qq.com----465----1" data-placeholder-en="E.g.&#10;user1@163.com----pass1&#10;user2@qq.com----pass2----smtp.qq.com----465----1"></textarea>
+                                <button type="button" id="email-smtp-btn-bulk-import" class="btn btn-primary" style="height: 34px; font-size: 12.5px; width: 100%;">
+                                    <span class="lang-zh">⚡ 智能识别并导入</span><span class="lang-en">⚡ Smart Parse & Import</span>
+                                </button>
+                            </div>
+
+                            <!-- Sender Accounts List (Preview and Delete) -->
+                            <div style="margin-top: 6px; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; background: rgba(255,255,255,0.02);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <h4 style="font-size: 12px; margin: 0; font-weight: 600;">
+                                        <span class="lang-zh">已配置发信账号列表 (<span id="email-smtp-accounts-count">0</span>)</span>
+                                        <span class="lang-en">Configured Senders (<span id="email-smtp-accounts-count-en">0</span>)</span>
+                                    </h4>
+                                    <button type="button" id="email-smtp-btn-clear-accounts" class="btn" style="padding: 2px 8px; font-size: 11px; color: #EF4444; border: 1px solid rgba(239,68,68,0.2); background: transparent; border-radius: 4px; cursor: pointer;">
+                                        <span class="lang-zh">清空全部</span><span class="lang-en">Clear All</span>
+                                    </button>
+                                </div>
+                                <div id="email-smtp-accounts-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+                                    <div style="font-size: 12px; opacity: 0.5; text-align: center; padding: 10px;" id="email-smtp-accounts-empty">
+                                        <span class="lang-zh">暂无已配置的邮箱账号，请在上方添加。</span><span class="lang-en">No accounts added yet.</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="email-form-row">
-                                <div style="display: flex; align-items: center; gap: 8px; height: 100%;">
-                                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; user-select: none;">
-                                        <input type="checkbox" id="email-smtp-secure" checked style="width: 18px; height: 18px; accent-color: var(--accent-blue); cursor: pointer;">
-                                        <span>🛡️ <span class="lang-zh">安全连接 (SSL/TLS)</span><span class="lang-en">Secure Connection (SSL)</span></span>
+
+                            <!-- Global Rotation & Delay Controls -->
+                            <div class="email-form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                        <span class="lang-zh">切换发信邮箱模式</span><span class="lang-en">Rotation Mode</span>
                                     </label>
+                                    <select id="email-smtp-rotate-mode" class="select-control" style="width: 100%; height: 38px; padding: 8px 12px;">
+                                        <option value="random">🎲 随机切换 / Random</option>
+                                        <option value="sequential" selected>🔁 顺序切换 / Sequential</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8;">
+                                        <span class="lang-zh">每个邮箱最大发信次数</span><span class="lang-en">Max Sends Per Mail</span>
+                                    </label>
+                                    <input type="number" id="email-smtp-rotate-limit" class="select-control" style="width: 100%; height: 38px; padding: 8px 14px; text-align: center;" value="5" min="1">
                                 </div>
                             </div>
+                            
                             <p style="font-size: 11.5px; opacity: 0.6; margin: 0; color: var(--accent-blue);">
-                                <span class="lang-zh">* 多邮箱防风控：多邮箱与授权码用英文逗号一一对应填入。发送时系统会根据设定的单邮箱最大发送次数，自动轮流或随机切换发信邮箱进行发送！</span>
-                                <span class="lang-en">* Multi-account anti-spam: match email accounts and passwords with commas. The system rotates/randomly switches account when threshold limit is reached.</span>
+                                <span class="lang-zh">* 多邮箱防风控：发送时系统会根据设定的单邮箱最大发送次数，自动轮流或随机切换列表中的发信邮箱进行发送！</span>
+                                <span class="lang-en">* Multi-account anti-spam: system rotates accounts from the list according to max send limit.</span>
                             </p>
                         </div>
 

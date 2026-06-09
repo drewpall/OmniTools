@@ -17227,6 +17227,67 @@ can effectively mitigate the vanishing gradient problem in deep networks.`),
 
 
             // Single Download Hook
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            const btnTextSpan = imageBtnDownload.querySelector('span');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            if (btnTextSpan) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                btnTextSpan.innerHTML = `<span class="lang-zh">下载转换后的图片</span><span class="lang-en">Download Processed Image</span>`;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            }
+
 
 
 
@@ -17482,7 +17543,68 @@ can effectively mitigate the vanishing gradient problem in deep networks.`),
 
 
 
-            // Download All Sequentially Hook
+            // ZIP Download Hook
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            const btnTextSpan = imageBtnDownload.querySelector('span');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            if (btnTextSpan) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                btnTextSpan.innerHTML = `<span class="lang-zh">下载打包的压缩包 (ZIP)</span><span class="lang-en">Download ZIP Archive</span>`;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            }
+
 
 
 
@@ -17490,94 +17612,516 @@ can effectively mitigate the vanishing gradient problem in deep networks.`),
 
 
 
-            imageBtnDownload.onclick = () => {
-
-
-
-
-
-
-
-                convertedImages.forEach((item, index) => {
-
-
-
-
-
-
-
+            imageBtnDownload.onclick = async () => {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                const originalHTML = imageBtnDownload.innerHTML;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                imageBtnDownload.disabled = true;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                const progressSpan = imageBtnDownload.querySelector('span');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                if (progressSpan) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    progressSpan.innerHTML = `<span class="lang-zh">正在生成压缩包...</span><span class="lang-en">Generating ZIP...</span>`;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                try {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const zip = new JSZip();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    convertedImages.forEach(item => {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        zip.file(item.name, item.blob);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const zipUrl = URL.createObjectURL(zipBlob);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const a = document.createElement('a');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    a.href = zipUrl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    a.download = 'images_converted.zip';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    document.body.appendChild(a);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    a.click();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    document.body.removeChild(a);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                     setTimeout(() => {
-
-
-
-
-
-
-
-                        const a = document.createElement('a');
-
-
-
-
-
-
-
-                        a.href = URL.createObjectURL(item.blob);
-
-
-
-
-
-
-
-                        a.download = item.name;
-
-
-
-
-
-
-
-                        document.body.appendChild(a);
-
-
-
-
-
-
-
-                        a.click();
-
-
-
-
-
-
-
-                        document.body.removeChild(a);
-
-
-
-
-
-
-
-                    }, index * 200); // interval to prevent browser thread blocking
-
-
-
-
-
-
-
-                });
-
-
-
-
-
-
-
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        URL.revokeObjectURL(zipUrl);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    }, 60000);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                } catch (err) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    console.error('Error generating zip:', err);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    alert(t('生成压缩包失败！', 'Failed to generate ZIP archive!'));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                } finally {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    imageBtnDownload.disabled = false;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    imageBtnDownload.innerHTML = originalHTML;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const restoreSpan = imageBtnDownload.querySelector('span');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    if (restoreSpan) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        restoreSpan.innerHTML = `<span class="lang-zh">下载打包的压缩包 (ZIP)</span><span class="lang-en">Download ZIP Archive</span>`;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             };
 
 

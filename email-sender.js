@@ -43,6 +43,7 @@
     let currentEngine = 'msal';
 
     // SMTP Multi-account Rotation state
+    let senderAccounts = [];
     let smtpActiveAccountIndex = 0;
     let smtpSendsCount = 0;
 
@@ -146,13 +147,17 @@
         const savedClientId = localStorage.getItem('email_client_id') || "";
         $('email-client-id-input').value = savedClientId;
 
-        // Restore SMTP credentials from localStorage
-        $('email-smtp-user').value = localStorage.getItem('email_smtp_user') || "";
-        $('email-smtp-pass').value = localStorage.getItem('email_smtp_pass') || "";
-        $('email-smtp-host').value = localStorage.getItem('email_smtp_host') || "";
-        $('email-smtp-port').value = localStorage.getItem('email_smtp_port') || "";
-        $('email-smtp-secure').checked = localStorage.getItem('email_smtp_secure') === 'true';
-        $('email-smtp-rotate-mode').value = localStorage.getItem('email_smtp_rotate_mode') || "random";
+        // Restore SMTP accounts list from localStorage
+        try {
+            const savedAccounts = localStorage.getItem('email_smtp_accounts');
+            senderAccounts = savedAccounts ? JSON.parse(savedAccounts) : [];
+        } catch (e) {
+            console.error("Failed to parse email_smtp_accounts", e);
+            senderAccounts = [];
+        }
+        renderSenderAccountsList();
+
+        $('email-smtp-rotate-mode').value = localStorage.getItem('email_smtp_rotate_mode') || "sequential";
         $('email-smtp-rotate-limit').value = localStorage.getItem('email_smtp_rotate_limit') || "5";
 
         // Restore active mailing engine
@@ -168,6 +173,92 @@
     };
 
 
+
+    function renderSenderAccountsList() {
+        const listContainer = $('email-smtp-accounts-list');
+        const countZh = $('email-smtp-accounts-count');
+        const countEn = $('email-smtp-accounts-count-en');
+        const emptyEl = $('email-smtp-accounts-empty');
+
+        if (!listContainer) return;
+
+        listContainer.innerHTML = '';
+
+        if (senderAccounts.length === 0) {
+            listContainer.appendChild(emptyEl || createEmptyPlaceholder());
+            if (countZh) countZh.textContent = '0';
+            if (countEn) countEn.textContent = '0';
+            return;
+        }
+
+        if (countZh) countZh.textContent = senderAccounts.length;
+        if (countEn) countEn.textContent = senderAccounts.length;
+
+        senderAccounts.forEach((account, index) => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; transition: all 0.2s ease;';
+            
+            item.onmouseover = () => item.style.background = 'rgba(255,255,255,0.06)';
+            item.onmouseout = () => item.style.background = 'rgba(255,255,255,0.03)';
+
+            const info = document.createElement('div');
+            info.style.cssText = 'display: flex; flex-direction: column; gap: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1;';
+            
+            const userSpan = document.createElement('span');
+            userSpan.style.fontWeight = '600';
+            userSpan.textContent = account.user;
+            
+            const detailsSpan = document.createElement('span');
+            detailsSpan.style.cssText = 'font-size: 10px; opacity: 0.6;';
+            detailsSpan.textContent = `Host: ${account.host} | Port: ${account.port} | SSL: ${account.secure ? 'Yes' : 'No'}`;
+            
+            info.appendChild(userSpan);
+            info.appendChild(detailsSpan);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.style.cssText = 'background: transparent; border: none; color: #EF4444; cursor: pointer; padding: 4px 8px; font-size: 12px; line-height: 1; border-radius: 4px; transition: background 0.2s;';
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.title = t('删除', 'Delete');
+            deleteBtn.onmouseover = () => deleteBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+            deleteBtn.onmouseout = () => deleteBtn.style.background = 'transparent';
+            
+            deleteBtn.addEventListener('click', () => {
+                senderAccounts.splice(index, 1);
+                localStorage.setItem('email_smtp_accounts', JSON.stringify(senderAccounts));
+                renderSenderAccountsList();
+                validateSmtpForm();
+            });
+
+            item.appendChild(info);
+            item.appendChild(deleteBtn);
+            listContainer.appendChild(item);
+        });
+    }
+
+    function createEmptyPlaceholder() {
+        const div = document.createElement('div');
+        div.id = 'email-smtp-accounts-empty';
+        div.style.cssText = 'font-size: 12px; opacity: 0.5; text-align: center; padding: 10px;';
+        div.innerHTML = `<span class="lang-zh">暂无已配置的邮箱账号，请在上方添加。</span><span class="lang-en">No accounts added yet.</span>`;
+        return div;
+    }
+
+    function guessSmtpSettings(email) {
+        const val = email.toLowerCase();
+        if (val.endsWith('@qq.com')) {
+            return { host: 'smtp.qq.com', port: '465', secure: true };
+        } else if (val.endsWith('@163.com')) {
+            return { host: 'smtp.163.com', port: '465', secure: true };
+        } else if (val.endsWith('@126.com')) {
+            return { host: 'smtp.126.com', port: '465', secure: true };
+        } else if (val.endsWith('@gmail.com')) {
+            return { host: 'smtp.gmail.com', port: '465', secure: true };
+        } else if (val.endsWith('@outlook.com') || val.endsWith('@hotmail.com')) {
+            return { host: 'smtp-mail.outlook.com', port: '587', secure: false };
+        }
+        return null;
+    }
 
     async function initializeMsalInstance(clientId) {
 
@@ -397,57 +488,190 @@
         $('email-tab-msal').addEventListener('click', () => switchEngine('msal'));
         $('email-tab-smtp').addEventListener('click', () => switchEngine('smtp'));
         
-        // SMTP Form Inputs Validation & Persistence
-        const saveSmtpCache = () => {
-            localStorage.setItem('email_smtp_user', $('email-smtp-user').value.trim());
-            localStorage.setItem('email_smtp_pass', $('email-smtp-pass').value.trim());
-            localStorage.setItem('email_smtp_host', $('email-smtp-host').value.trim());
-            localStorage.setItem('email_smtp_port', $('email-smtp-port').value.trim());
-            localStorage.setItem('email_smtp_secure', $('email-smtp-secure').checked);
-            localStorage.setItem('email_smtp_rotate_mode', $('email-smtp-rotate-mode').value);
-            localStorage.setItem('email_smtp_rotate_limit', $('email-smtp-rotate-limit').value.trim());
-        };
+        // Tab switching for Single / Bulk SMTP input
+        const tabSingle = $('email-smtp-tab-single');
+        const tabBulk = $('email-smtp-tab-bulk');
+        const formSingle = $('email-smtp-single-form');
+        const formBulk = $('email-smtp-bulk-form');
 
-        $('email-smtp-user').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
-        $('email-smtp-pass').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
-        $('email-smtp-host').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
-        $('email-smtp-port').addEventListener('input', () => { validateSmtpForm(); saveSmtpCache(); });
-        $('email-smtp-secure').addEventListener('change', saveSmtpCache);
-        $('email-smtp-rotate-mode').addEventListener('change', saveSmtpCache);
-        $('email-smtp-rotate-limit').addEventListener('input', saveSmtpCache);
+        if (tabSingle && tabBulk) {
+            tabSingle.addEventListener('click', () => {
+                tabSingle.classList.add('active');
+                tabSingle.style.background = 'var(--border-color)';
+                tabSingle.style.border = 'none';
+                
+                tabBulk.classList.remove('active');
+                tabBulk.style.background = 'transparent';
+                tabBulk.style.border = '1px solid var(--border-color)';
+                
+                formSingle.style.display = 'flex';
+                formBulk.style.display = 'none';
+            });
 
-        // SMTP Auto-completion helper
-        $('email-smtp-user').addEventListener('blur', (e) => {
-            const val = e.target.value.trim().toLowerCase();
-            const hostInput = $('email-smtp-host');
-            const portInput = $('email-smtp-port');
-            const secureInput = $('email-smtp-secure');
+            tabBulk.addEventListener('click', () => {
+                tabBulk.classList.add('active');
+                tabBulk.style.background = 'var(--border-color)';
+                tabBulk.style.border = 'none';
+                
+                tabSingle.classList.remove('active');
+                tabSingle.style.background = 'transparent';
+                tabSingle.style.border = '1px solid var(--border-color)';
+                
+                formBulk.style.display = 'flex';
+                formSingle.style.display = 'none';
+            });
+        }
 
-            if (!hostInput.value) {
-                if (val.endsWith('@qq.com')) {
-                    hostInput.value = 'smtp.qq.com';
-                    portInput.value = '465';
-                    secureInput.checked = true;
-                } else if (val.endsWith('@163.com')) {
-                    hostInput.value = 'smtp.163.com';
-                    portInput.value = '465';
-                    secureInput.checked = true;
-                } else if (val.endsWith('@126.com')) {
-                    hostInput.value = 'smtp.126.com';
-                    portInput.value = '465';
-                    secureInput.checked = true;
-                } else if (val.endsWith('@gmail.com')) {
-                    hostInput.value = 'smtp.gmail.com';
-                    portInput.value = '465';
-                    secureInput.checked = true;
-                } else if (val.endsWith('@outlook.com') || val.endsWith('@hotmail.com')) {
-                    hostInput.value = 'smtp-mail.outlook.com';
-                    portInput.value = '587';
-                    secureInput.checked = false;
+        // Auto guessing host & port when manual typing email address
+        const singleUserInput = $('email-smtp-single-user');
+        if (singleUserInput) {
+            singleUserInput.addEventListener('blur', (e) => {
+                const val = e.target.value.trim().toLowerCase();
+                const hostInput = $('email-smtp-single-host');
+                const portInput = $('email-smtp-single-port');
+                const secureInput = $('email-smtp-single-secure');
+
+                if (val && !hostInput.value) {
+                    const guess = guessSmtpSettings(val);
+                    if (guess) {
+                        hostInput.value = guess.host;
+                        portInput.value = guess.port;
+                        secureInput.checked = guess.secure;
+                    }
                 }
-            }
-            validateSmtpForm();
-            saveSmtpCache();
+            });
+        }
+
+        // Add single account
+        const btnAddSingle = $('email-smtp-btn-add-single');
+        if (btnAddSingle) {
+            btnAddSingle.addEventListener('click', () => {
+                const user = $('email-smtp-single-user').value.trim();
+                const pass = $('email-smtp-single-pass').value.trim();
+                let host = $('email-smtp-single-host').value.trim();
+                let port = $('email-smtp-single-port').value.trim();
+                const secure = $('email-smtp-single-secure').checked;
+
+                if (!user || !user.includes('@')) {
+                    alert(t('请输入有效的发信人邮箱！', 'Please enter a valid sender email!'));
+                    return;
+                }
+                if (!pass) {
+                    alert(t('请输入邮箱密码或授权码！', 'Please enter email password or auth code!'));
+                    return;
+                }
+
+                // If host or port is empty, guess them
+                if (!host || !port) {
+                    const guess = guessSmtpSettings(user.toLowerCase());
+                    if (guess) {
+                        if (!host) host = guess.host;
+                        if (!port) port = guess.port;
+                    } else {
+                        if (!host) host = 'smtp.' + user.split('@')[1];
+                        if (!port) port = '465';
+                    }
+                }
+
+                const newAccount = { user, pass, host, port, secure };
+                senderAccounts.push(newAccount);
+                localStorage.setItem('email_smtp_accounts', JSON.stringify(senderAccounts));
+                
+                // Reset inputs
+                $('email-smtp-single-user').value = '';
+                $('email-smtp-single-pass').value = '';
+                $('email-smtp-single-host').value = '';
+                $('email-smtp-single-port').value = '465';
+                $('email-smtp-single-secure').checked = true;
+
+                renderSenderAccountsList();
+                validateSmtpForm();
+                logToConsole(t(`➕ 手动添加发信人成功: ${user}`, `➕ Manually added sender successfully: ${user}`));
+            });
+        }
+
+        // Bulk import accounts
+        const btnBulkImport = $('email-smtp-btn-bulk-import');
+        if (btnBulkImport) {
+            btnBulkImport.addEventListener('click', () => {
+                const rawText = $('email-smtp-bulk-input').value.trim();
+                if (!rawText) {
+                    alert(t('请先粘贴批量邮箱文本数据！', 'Please enter bulk email accounts data first!'));
+                    return;
+                }
+
+                const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                let addedCount = 0;
+
+                lines.forEach(line => {
+                    // Split by ---- or multiple spaces or tabs or commas or semicolons
+                    const parts = line.split(/----+|\s+|\t+|,|;/).map(p => p.trim()).filter(p => p.length > 0);
+                    if (parts.length >= 2) {
+                        const user = parts[0];
+                        const pass = parts[1];
+                        let host = parts[2] || '';
+                        let port = parts[3] || '';
+                        let secure = true;
+
+                        if (parts[4] !== undefined) {
+                            const secVal = parts[4].toLowerCase();
+                            if (secVal === '0' || secVal === 'false' || secVal === 'no') {
+                                secure = false;
+                            }
+                        }
+
+                        // Guess if host/port is not specified
+                        if (!host || !port) {
+                            const guess = guessSmtpSettings(user.toLowerCase());
+                            if (guess) {
+                                if (!host) host = guess.host;
+                                if (!port) port = guess.port;
+                                if (parts[4] === undefined) secure = guess.secure;
+                            } else {
+                                if (!host) host = 'smtp.' + user.split('@')[1];
+                                if (!port) port = '465';
+                            }
+                        }
+
+                        senderAccounts.push({ user, pass, host, port, secure });
+                        addedCount++;
+                    }
+                });
+
+                if (addedCount > 0) {
+                    localStorage.setItem('email_smtp_accounts', JSON.stringify(senderAccounts));
+                    renderSenderAccountsList();
+                    validateSmtpForm();
+                    $('email-smtp-bulk-input').value = '';
+                    logToConsole(t(`⚡ 批量识别并导入 ${addedCount} 个发信账号成功。`, `⚡ Successfully imported ${addedCount} sender accounts.`));
+                    alert(t(`成功识别并导入 ${addedCount} 个发信账号！`, `Successfully imported ${addedCount} accounts!`));
+                } else {
+                    alert(t('未能解析出有效的账号，请检查输入格式是否为 邮箱----密码！', 'Failed to parse accounts. Format should be: email----password'));
+                }
+            });
+        }
+
+        // Clear all accounts
+        const btnClearAccounts = $('email-smtp-btn-clear-accounts');
+        if (btnClearAccounts) {
+            btnClearAccounts.addEventListener('click', () => {
+                if (senderAccounts.length === 0) return;
+                if (confirm(t('确定清空所有已配置的发信邮箱吗？', 'Are you sure you want to clear all sender accounts?'))) {
+                    senderAccounts = [];
+                    localStorage.setItem('email_smtp_accounts', JSON.stringify(senderAccounts));
+                    renderSenderAccountsList();
+                    validateSmtpForm();
+                    logToConsole(t('🗑️ 清空了所有发信邮箱账号。', '🗑️ Cleared all sender accounts.'));
+                }
+            });
+        }
+
+        // Save rotate controls state
+        $('email-smtp-rotate-mode').addEventListener('change', (e) => {
+            localStorage.setItem('email_smtp_rotate_mode', e.target.value);
+        });
+        $('email-smtp-rotate-limit').addEventListener('input', (e) => {
+            localStorage.setItem('email_smtp_rotate_limit', e.target.value.trim());
         });
 
         // Clear log console
@@ -1083,52 +1307,47 @@
                 errMsg = err.message;
             }
         } else {
-            // Parse multi-account lists (splits by comma OR newline)
-            const rawUsers = $('email-smtp-user').value.trim();
-            const rawPasses = $('email-smtp-pass').value.trim();
-            const users = rawUsers.split(/[\n,]/).map(u => u.trim()).filter(u => u.length > 0);
-            const passes = rawPasses.split(/[\n,]/).map(p => p.trim()).filter(p => p.length > 0);
+            // Use senderAccounts list
             const maxSendsLimit = parseInt($('email-smtp-rotate-limit').value.trim(), 10) || 5;
             const rotateMode = $('email-smtp-rotate-mode').value;
 
-            if (users.length === 0 || passes.length === 0) {
-                logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 失败: 未填写 SMTP 发信邮箱或密码，暂停队列。`);
+            if (senderAccounts.length === 0) {
+                logToConsole(`[${queueIndex + 1}/${queue.length}] ❌ 失败: 未配置任何 SMTP 发信邮箱，暂停队列。`);
                 pauseSending();
                 return;
             }
 
             // Apply rotation threshold trigger
-            if (smtpSendsCount >= maxSendsLimit && users.length > 1) {
+            if (smtpSendsCount >= maxSendsLimit && senderAccounts.length > 1) {
                 if (rotateMode === 'random') {
                     let nextIdx = smtpActiveAccountIndex;
                     while (nextIdx === smtpActiveAccountIndex) {
-                        nextIdx = Math.floor(Math.random() * users.length);
+                        nextIdx = Math.floor(Math.random() * senderAccounts.length);
                     }
                     smtpActiveAccountIndex = nextIdx;
                 } else {
-                    smtpActiveAccountIndex = (smtpActiveAccountIndex + 1) % users.length;
+                    smtpActiveAccountIndex = (smtpActiveAccountIndex + 1) % senderAccounts.length;
                 }
                 smtpSendsCount = 0;
-                logToConsole(`🔄 已达到单邮箱发信限制次数 (${maxSendsLimit} 次)，自动轮换发信账户。新发信账号: ${users[smtpActiveAccountIndex]}`);
+                logToConsole(`🔄 已达到单邮箱发信限制次数 (${maxSendsLimit} 次)，自动轮换发信账户。新发信账号: ${senderAccounts[smtpActiveAccountIndex].user}`);
             }
 
             // Fallback safe indexes
-            if (smtpActiveAccountIndex >= users.length) {
+            if (smtpActiveAccountIndex >= senderAccounts.length) {
                 smtpActiveAccountIndex = 0;
             }
             
-            const activeUser = users[smtpActiveAccountIndex];
-            const activePass = passes[smtpActiveAccountIndex] || passes[0] || "";
+            const activeAccount = senderAccounts[smtpActiveAccountIndex];
 
             const targetRepeatCount = parseInt($('email-recipient-send-count').value.trim(), 10) || 1;
-            logToConsole(`[${queueIndex + 1}/${queue.length}] 📤 正在使用发信箱: ${activeUser} 发送给: ${recipientEmail} (第 ${recipientSendIteration + 1}/${targetRepeatCount} 次)...`);
+            logToConsole(`[${queueIndex + 1}/${queue.length}] 📤 正在使用发信箱: ${activeAccount.user} 发送给: ${recipientEmail} (第 ${recipientSendIteration + 1}/${targetRepeatCount} 次)...`);
 
             const smtpConfig = {
-                smtpHost: $('email-smtp-host').value.trim(),
-                smtpPort: $('email-smtp-port').value.trim(),
-                secure: $('email-smtp-secure').checked,
-                user: activeUser,
-                pass: activePass,
+                smtpHost: activeAccount.host,
+                smtpPort: activeAccount.port,
+                secure: activeAccount.secure,
+                user: activeAccount.user,
+                pass: activeAccount.pass,
                 to: recipientEmail,
                 subject: finalSubject,
                 body: finalBody,
@@ -1206,13 +1425,9 @@
 
     function validateSmtpForm() {
         if (currentEngine !== 'smtp') return;
-        const user = $('email-smtp-user').value.trim();
-        const pass = $('email-smtp-pass').value.trim();
-        const host = $('email-smtp-host').value.trim();
-        const port = $('email-smtp-port').value.trim();
         const startBtn = $('email-btn-start');
 
-        if (user && pass && host && port && queue.length > 0) {
+        if (senderAccounts.length > 0 && queue.length > 0) {
             startBtn.disabled = false;
         } else {
             startBtn.disabled = true;
