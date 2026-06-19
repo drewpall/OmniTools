@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隐私政策 | Privacy Policy - OmniTools</title>
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --primary-hover: #0056b3;
+            --bg-color: #ffffff;
+            --text-color: #1d1d1f;
+            --secondary-text: #6e6e73;
+            --border-color: #d2d2d7;
+            --card-bg: #f5f5f7;
+            --toc-hover: rgba(0, 122, 255, 0.1);
+            --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #161617;
+                --text-color: #f5f5f7;
+                --secondary-text: #86868b;
+                --border-color: #333336;
+                --card-bg: #1d1d1f;
+                --toc-hover: rgba(10, 132, 255, 0.15);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--apple-font);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* 顶部导航 */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(22, 22, 23, 0.8);
+            }
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .lang-switch {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .lang-btn {
+            border: none;
+            background: none;
+            padding: 6px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 16px;
+            cursor: pointer;
+            color: var(--secondary-text);
+            transition: all 0.2s ease;
+        }
+
+        .lang-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* 页面布局 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: flex;
+            gap: 40px;
+        }
+
+        /* 侧边导航 (目录) */
+        .sidebar {
+            width: 300px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 100px;
+            height: calc(100vh - 140px);
+            overflow-y: auto;
+            padding-right: 15px;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .toc-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--secondary-text);
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-item {
+            margin-bottom: 6px;
+        }
+
+        .toc-link {
+            display: block;
+            padding: 8px 12px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 13.5px;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toc-link:hover {
+            background: var(--toc-hover);
+            color: var(--primary-color);
+        }
+
+        .toc-link.active {
+            background: var(--toc-hover);
+            color: var(--primary-color);
+            font-weight: 600;
+            border-left: 3px solid var(--primary-color);
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            flex-grow: 1;
+            max-width: 820px;
+        }
+
+        .section {
+            margin-bottom: 50px;
+            scroll-margin-top: 100px;
+        }
+
+        h1 {
+            font-size: 34px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .update-date {
+            color: var(--secondary-text);
+            font-size: 13px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 40px;
+            margin-bottom: 18px;
+            border-bottom: 1.5px solid var(--border-color);
+            padding-bottom: 6px;
+            color: var(--text-color);
+        }
+
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        p {
+            font-size: 14.5px;
+            margin-bottom: 16px;
+            color: var(--text-color);
+            opacity: 0.9;
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 20px;
+            color: var(--text-color);
+            opacity: 0.9;
+        }
+
+        li {
+            margin-bottom: 10px;
+            font-size: 14.5px;
+        }
+
+        /* 表格样式 */
+        .policy-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 13.5px;
+        }
+
+        .policy-table th, .policy-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .policy-table th {
+            background-color: var(--card-bg);
+            font-weight: 600;
+        }
+
+        /* 提示框 */
+        .alert-box {
+            background: var(--card-bg);
+            border-left: 4px solid var(--primary-color);
+            padding: 18px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 25px;
+        }
+
+        .alert-box p {
+            margin-bottom: 0;
+            font-size: 13.5px;
+            line-height: 1.6;
+            color: var(--text-color);
+        }
+
+        /* 隐藏的语言类 */
+        .lang-section {
+            display: none;
+        }
+
+        .lang-section.active {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            padding: 50px 20px;
+            margin-top: 60px;
+            border-top: 1px solid var(--border-color);
+            color: var(--secondary-text);
+            font-size: 13px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            .sidebar {
+                display: none; /* 移动端隐藏侧边栏 */
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            h2 {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="logo">
+            <img src="assets/appicon.png" alt="OmniTools Logo">
+            <span>OmniTools</span>
+        </a>
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+            <button class="lang-btn" onclick="switchLang('en')">English</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 侧边栏导航：中文版 -->
+        <aside class="sidebar lang-section active" id="sidebar-zh">
+            <div class="toc-title">目录</div>
+            <ul class="toc-list">
+                <li class="toc-item"><a href="#zh-intro" class="toc-link active">1. 导言与合规声明</a></li>
+                <li class="toc-item"><a href="#zh-collect" class="toc-link">2. 信息收集与使用详述</a></li>
+                <li class="toc-item"><a href="#zh-legal" class="toc-link">3. 数据处理的合法性基础</a></li>
+                <li class="toc-item"><a href="#zh-permission" class="toc-link">4. 设备权限调用及控制</a></li>
+                <li class="toc-item"><a href="#zh-storage" class="toc-link">5. 数据存储期限与安全防护</a></li>
+                <li class="toc-item"><a href="#zh-share" class="toc-link">6. 第三方共享与数据跨境传输</a></li>
+                <li class="toc-item"><a href="#zh-rights" class="toc-link">7. 您的个人信息主体权利</a></li>
+                <li class="toc-item"><a href="#zh-children" class="toc-link">8. 未成年人及儿童隐私保护</a></li>
+                <li class="toc-item"><a href="#zh-state" class="toc-link">9. 特定法域特别条款</a></li>
+                <li class="toc-item"><a href="#zh-changes" class="toc-link">10. 政策更新与联系渠道</a></li>
+            </ul>
+        </aside>
+
+        <!-- 侧边栏导航：英文版 -->
+        <aside class="sidebar lang-section" id="sidebar-en">
+            <div class="toc-title">TABLE OF CONTENTS</div>
+            <ul class="toc-list">
+                <li class="toc-item"><a href="#en-intro" class="toc-link">1. Intro & Compliance</a></li>
+                <li class="toc-item"><a href="#en-collect" class="toc-link">2. Collection & Usage details</a></li>
+                <li class="toc-item"><a href="#en-legal" class="toc-link">3. Legal Bases for Processing</a></li>
+                <li class="toc-item"><a href="#en-permission" class="toc-link">4. Device Permissions Control</a></li>
+                <li class="toc-item"><a href="#en-storage" class="toc-link">5. Data Retention & Safeguards</a></li>
+                <li class="toc-item"><a href="#en-share" class="toc-link">6. Third-Party & Cross-Border</a></li>
+                <li class="toc-item"><a href="#en-rights" class="toc-link">7. Your Data Subject Rights</a></li>
+                <li class="toc-item"><a href="#en-children" class="toc-link">8. Children's Privacy Compliance</a></li>
+                <li class="toc-item"><a href="#en-state" class="toc-link">9. Jurisdiction-Specific Laws</a></li>
+                <li class="toc-item"><a href="#en-changes" class="toc-link">10. Contact Details & Revisions</a></li>
+            </ul>
+        </aside>
+
+        <!-- 主要内容 -->
+        <main class="main-content">
+            
+            <!-- 中文内容 -->
+            <div class="lang-section active" id="content-zh">
+                <section class="section" id="zh-intro">
+                    <h1>隐私政策</h1>
+                    <div class="update-date">最后更新与生效日期：2026年6月19日</div>
+                    
+                    <div class="alert-box">
+                        <p><strong>重要声明与用户须知：</strong><br>
+                        本隐私政策适用于我们开发并运营的移动端应用程序 <strong>“OmniTools”</strong>（以下统称“本应用”、“本产品”或“我们”）。
+                        我们高度重视用户（以下简称为“您”）的个人隐私和数据安全。本隐私政策依据中华人民共和国相关数据保护法律法规、欧盟《通用数据保护条例》（GDPR）、美国加州《消费者隐私法》（CCPA）以及苹果 App Store 关于 App 数据隐私的最新审核准则编撰而成。
+                        </p>
+                    </div>
+
+                    <p>在您下载、安装或使用本产品前，请仔细阅读本《隐私政策》，特别是用粗体标出的核心数据使用与权限限制条款。若您继续使用本产品，即代表您同意我们按照本政策所述收集、使用、存储您的个人数据。如果您不同意本政策，可能无法体验本产品提供的完整服务。</p>
+                </section>
+
+                <section class="section" id="zh-collect">
+                    <h2>2. 信息收集与使用详述</h2>
+                    <p>本产品秉承<strong>“数据最小化”、“目的限制”</strong>与<strong>“本地优先处理”</strong>的原则。我们优先利用您的本地计算资源完成功能性需求，旨在避免将您的敏感行为信息置于公共网络或服务器之上。</p>
+                    
+                    <h3>2.1 在本地处理的数据（我们不收集，不上传）</h3>
+                    <ul>
+                        <li><strong>NFC卡片信息：</strong>当您使用本应用中的 NFC 读写功能时，读取的标签 ID、扇区信息、NDEF 记录等卡片数据仅存储在运行内存中，并在关闭页面时销毁；保存到“卡包”功能的数据直接存入 iOS 设备本地沙盒，绝不上传到我们的云端服务器。</li>
+                        <li><strong>系统小组件与状态信息：</strong>系统状态检测（包括但不限于 CPU 占用率、RAM 运行内存使用情况、网络吞吐状态、电池电量等）均直接通过底层接口获取，由系统进程刷新显示，该数据完全属于本地瞬时数据，无持久化记录，更无任何上传行为。</li>
+                        <li><strong>倒数日与小组件备忘录：</strong>您输入的所有纪念日、倒计时标题、事件备注，均利用 CoreData 技术保存在设备本地，并仅能通过您的个人 iCloud 在设备间同步（如果开启），我们没有任何后台数据库存储您的备忘文本。</li>
+                    </ul>
+
+                    <h3>2.2 我们收集并上传的信息（最小化范围）</h3>
+                    <ul>
+                        <li><strong>网络诊断与延迟数据：</strong>为了向您提供“网络测速”与“IP 地理位置诊断”服务，应用需要向我们的解析端或公共测速节点发起 Ping 包与 HTTP 连接测试。在此交互过程中，目标服务器将读取您的<strong>公共 IP 地址</strong>以确定您所处的物理归属地区、网络运营商。我们不对该 IP 地址与您的个人身份（如姓名、注册账号）进行任何关联，测试完毕后直接抛弃或作为匿名去标识化数据进行合并统计。</li>
+                        <li><strong>应用故障与系统崩溃日志：</strong>为了解决闪退问题并提高稳定性，本应用引入了第三方监控 SDK（Firebase Crashlytics）。当发生应用崩溃时，该 SDK 将收集设备型号、操作系统版本、崩溃时的内存堆栈、唯一匿名安装 ID 以及日志上下文。此类信息属于完全脱敏的非个人身份标识信息，仅用于技术排查。</li>
+                    </ul>
+                </section>
+
+                <section class="section" id="zh-legal">
+                    <h2>3. 数据处理的合法性基础</h2>
+                    <p>依据相关法律（如 GDPR 第 6 条），我们收集和处理您的个人数据，必须具备至少一项合法的法律基础：</p>
+                    <ol>
+                        <li><strong>履行合同义务：</strong>为向您提供您请求的工具服务（如 IP 位置显示、网络诊断、数据导出），处理上述网络连接信息和存储写入是实现核心功能所必需的；</li>
+                        <li><strong>您的同意：</strong>在向您申请特定硬件调用（如相机、NFC 硬件、通知接口）时，我们会明确请求您的单独授权，您可以随时在系统层级撤销同意；</li>
+                        <li><strong>正当法律利益：</strong>我们分析去标识化的运行和奔溃日志，是为了排查软件重大故障、预防网络欺诈，从而不断提升软件系统的可靠性。</li>
+                    </ol>
+                </section>
+
+                <section class="section" id="zh-permission">
+                    <h2>4. 设备权限调用及控制</h2>
+                    <p>为了向您提供多维度的实用工具服务，本应用将在特定场景下向您的操作系统申请调用以下系统权限。我们在此披露其具体作用以及对应的控制方式：</p>
+                    
+                    <table class="policy-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">系统权限</th>
+                                <th style="width: 50%;">具体调用目的/场景</th>
+                                <th style="width: 25%;">用户拒绝后的后果</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>NFC (近场通信)</strong></td>
+                                <td>用户主动触发 NFC 卡片扫描、信息读取与写入标签时调用 NFC 模块芯片。</td>
+                                <td>无法读取或烧录 NFC 标签，但不影响其他不相关工具使用。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>网络访问与蜂窝数据</strong></td>
+                                <td>用于获取当前公共 IP 信息、执行测速 Ping 测试、加载远程小组件内容及提交匿名闪退日志。</td>
+                                <td>无法进行网络检测及网络依赖的分析，单机本地功能仍可正常运行。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>通知权限 (Notification)</strong></td>
+                                <td>倒数日、纪念日到达临界值时的定时通知，以及后台小组件状态变更的通知推送。</td>
+                                <td>将不会收到事件提醒通知，小组件数据更新可能产生延迟。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>相册/写入存储 (Photos)</strong></td>
+                                <td>用于将用户生成的 App Store 截图导出海报、测量直尺截图直接保存到系统相册中。</td>
+                                <td>无法保存图片到相册。用户可通过截屏等方式替代，或再次授权开启。</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="section" id="zh-storage">
+                    <h2>5. 数据存储期限与安全防护</h2>
+                    
+                    <h3>5.1 存储期限</h3>
+                    <ul>
+                        <li><strong>本地沙盒数据：</strong>除非您主动卸载应用或清除应用数据，否则本地的卡包数据、倒计时、设置参数将永久保存在您的设备存储中。</li>
+                        <li><strong>服务器端与诊断数据：</strong>在网络诊断服务中，IP 地址和相关延迟指标在单次网络会话关闭后立即清除。Firebase Telemetry（异常堆栈和性能指标日志）在第三方服务器中的保留期限不超过 90 天，且该日志无法关联到任何自然人。</li>
+                    </ul>
+
+                    <h3>5.2 安全防护措施</h3>
+                    <p>我们采用多种符合业界标准的安全控制措施来防止用户数据丢失、误用、未经授权的访问或公开披露。具体包括：使用 HTTPS 安全加密通道进行所有外部网络传输；利用 iOS 系统的 App 沙盒（Sandbox）隔离机制防止恶意应用读取数据；在本地存储中对敏感信息进行多重混淆与非对称性加密。若发生意外的安全事故，我们将启动应急预案，并依法向监管机构报告并通知受影响的用户。</p>
+                </section>
+
+                <section class="section" id="zh-share">
+                    <h2>6. 第三方共享与数据跨境传输</h2>
+                    
+                    <h3>6.1 第三方服务商列表</h3>
+                    <p>本产品集成了以下第三方软件开发工具包（SDK），用于提升稳定性及排查漏洞，具体情况如下表：</p>
+                    <table class="policy-table">
+                        <thead>
+                            <tr>
+                                <th>服务商名称</th>
+                                <th>收集的匿名数据类型</th>
+                                <th>集成目的</th>
+                                <th>隐私政策链接</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Google Firebase (Crashlytics)</td>
+                                <td>崩溃日志、操作系统版本、设备型号、唯一随机安装 ID（不涉及 IMEI/IDFA 个人信息）</td>
+                                <td>分析软件闪退故障、监控线上版本的技术健康度</td>
+                                <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase 隐私条款</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>6.2 数据跨境传输说明</h3>
+                    <p>由于 Firebase 等分析工具的服务器位于美国等海外区域，为了保障数据跨境的安全，我们已与上述提供方签署了包含《标准合同条款》（SCCs）的服务协议，以确保您个人数据的出境处理享有不低于您所在法域的数据保护水平。</p>
+                </section>
+
+                <section class="section" id="zh-rights">
+                    <h2>7. 您的个人信息主体权利</h2>
+                    <p>根据适用法域的数据保护法，您对自己的个人信息拥有广泛的主体权利。针对本应用，您享有以下权利：</p>
+                    <ul>
+                        <li><strong>访问权与获取副本：</strong>您可以通过查看本应用的各个功能板块（如本地数据库的 NFC 记录、倒计时备注）直接访问您的本地信息。</li>
+                        <li><strong>更正权：</strong>您可以在应用编辑页面直接对输入的信息（如倒数日内容）进行任意修改和订正。</li>
+                        <li><strong>删除权（“被遗忘权”）：</strong>本应用的所有数据都存储在本地，当您长按删除某个项目或直接在设备中<strong>卸载本应用</strong>时，您在本地生成的所有数据都将被永久且不可恢复地擦除。如果您曾使用任何由我们代理的远程查询，由于我们不留存此类历史 IP 记录，因此无需执行服务器端删除。</li>
+                        <li><strong>撤回同意权：</strong>您可以随时通过系统“设置”->“隐私”路径关闭相应的设备权限（如网络访问、NFC、相册、通知），以撤回我们继续调用该权限和处理关联数据的授权。</li>
+                    </ul>
+                </section>
+
+                <section class="section" id="zh-children">
+                    <h2>8. 未成年人及儿童隐私保护</h2>
+                    <p>本应用是面向普通大众的效率和诊断工具，其主要业务功能<strong>不针对 14 周岁（或您所在辖区的等同法定年龄）以下的儿童</strong>。我们不会出于商业或营销目的故意收集任何儿童的个人隐私信息。如果您是未成年人，请务必在法定监护人的许可与陪同下浏览或使用本应用。如果我们发现有儿童在未取得家长同意的前提下提供了个人信息，我们将依法立即删除这部分数据。</p>
+                </section>
+
+                <section class="section" id="zh-state">
+                    <h2>9. 特定法域特别条款</h2>
+                    
+                    <h3>9.1 加州消费者隐私法（CCPA/CPRA）告知</h3>
+                    <p>依据加州消费者隐私法的要求，我们在此特别声明：在过去 12 个月内，我们<strong>没有且未来也不会</strong>出售或出租您的个人信息，亦不存在跨上下文的行为广告共享行为。您有权拒绝接受销售个人信息的请求，并免受行使隐私权利的歧视。</p>
+
+                    <h3>9.2 欧盟通用数据保护条例（GDPR）告知</h3>
+                    <p>若您身处欧洲经济区（EEA），我们作为“数据控制者”（Data Controller）对您的个人数据进行有限的处理。您有权就我们的数据处理行为向您居住国或工作地的数据保护监管机构提出申诉。</p>
+                </section>
+
+                <section class="section" id="zh-changes">
+                    <h2>10. 政策更新与联系渠道</h2>
+                    <p>随着 OmniTools 的服务更新，本隐私政策可能会进行修订。我们会将最新版本发布在此网页上，并更新“最后更新与生效日期”。对于有重大法律效力变更的更新，我们会在应用内以显著的弹框或公告形式提示您重新确认。</p>
+                    
+                    <p>如果您对本政策有任何疑问、建议或投诉，请发送邮件与我们联系。为了核实您的身份以保障账户安全，我们可能会请求您提供必要的设备标识证明。</p>
+                    <ul>
+                        <li><strong>电子邮箱：</strong> <a href="mailto:tendril_curved_5i@icloud.com" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">tendril_curved_5i@icloud.com</a></li>
+                        <li><strong>反馈处理时效：</strong>我们将在收到您的邮件并确认身份后，于 15 个工作日内给予书面答复或实施删除/纠正操作。</li>
+                    </ul>
+                </section>
+            </div>
+
+            <!-- 英文内容 -->
+            <div class="lang-section" id="content-en">
+                <section class="section" id="en-intro">
+                    <h1>Privacy Policy</h1>
+                    <div class="update-date">Last Updated & Effective: June 19, 2026</div>
+
+                    <div class="alert-box">
+                        <p><strong>Important Announcement & User Notice:</strong><br>
+                        This Privacy Policy applies to the mobile application <strong>"OmniTools"</strong> (hereinafter referred to as "the App", "the Product", or "we") developed and operated by us.
+                        We are highly committed to safeguarding the privacy and data security of our users ("you"). This policy has been drafted in compliance with local personal data protection acts, the General Data Protection Regulation (GDPR) of the EU, the California Consumer Privacy Act (CCPA), and the latest App Privacy rules on Apple's App Store.
+                        </p>
+                    </div>
+
+                    <p>Please read this Privacy Policy carefully before downloading, installing, or using the App. By continuing to use the Product, you consent to our practices of collecting and handling your data as described in this policy.</p>
+                </section>
+
+                <section class="section" id="en-collect">
+                    <h2>2. Collection & Usage details</h2>
+                    <p>The App operates under the core principles of <strong>"Data Minimization", "Purpose Limitation"</strong> and <strong>"Local-First Processing"</strong>. We maximize the use of local CPU and memory resources to perform computation locally on your device.</p>
+                    
+                    <h3>2.1 Data Processed Locally (Not Collected or Transmitted)</h3>
+                    <ul>
+                        <li><strong>NFC Details:</strong> When using the NFC read/write utilities, read card payloads, sector parameters, or NDEF formats reside transiently in system memory and are cleared when the module closes. Saved "vault" items are written only to the secure Sandbox.</li>
+                        <li><strong>System Dashboard Specs:</strong> Telemetry metrics like CPU loads, physical RAM usage, net throughput, and battery voltages are fetched directly from iOS system framework interfaces. These are displayed instantaneously without local databases or cloud exports.</li>
+                        <li><strong>Countdown Memo Logs:</strong> Any anniversary dates, timer tags, and memo lists are saved locally via CoreData. Syncing only takes place if you enable personal iCloud sync. We have no remote server hosting your notes.</li>
+                    </ul>
+
+                    <h3>2.2 Data Collected and Shared (Minimal Scope)</h3>
+                    <ul>
+                        <li><strong>Network Ping & Latency Telemetry:</strong> To conduct latency tests and IP geological analysis, short connection requests are processed. Remote endpoints read your **public IP address** to determine location and ISP info. We do not link this metadata with personal IDs.</li>
+                        <li><strong>App Diagnostics & Crash Logs:</strong> We integrate Google Firebase Crashlytics to resolve software bugs and system failures. It gathers device hardware model, iOS version, memory dump files, and a random installation ID. This log contains no personal information.</li>
+                    </ul>
+                </section>
+
+                <section class="section" id="en-legal">
+                    <h2>3. Legal Bases for Processing</h2>
+                    <p>Under GDPR Article 6, our processing of your personal data rests on the following legitimate grounds:</p>
+                    <ol>
+                        <li><strong>Performance of a Contract:</strong> Processing network tests or saving exported photos is essential to deliver the tool functionality you request.</li>
+                        <li><strong>Consent:</strong> Hardware accesses (NFC chips, notifications, Camera) require separate user permission, which can be modified or revoked in Settings.</li>
+                        <li><strong>Legitimate Interests:</strong> Analysis of anonymous diagnostic logging protects system integrity, identifies severe failures, and thwarts malicious exploits.</li>
+                    </ol>
+                </section>
+
+                <section class="section" id="en-permission">
+                    <h2>4. Device Permissions Control</h2>
+                    <p>To support all efficiency tools, the App may request access permissions under iOS. The table below lists their specific objectives:</p>
+                    
+                    <table class="policy-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Permission</th>
+                                <th style="width: 50%;">Usage Scenario</th>
+                                <th style="width: 25%;">Consequences of Denial</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>NFC</strong></td>
+                                <td>Required to scan, read, or write NFC tags and cards using physical chips.</td>
+                                <td>NFC reading and writing tools will be disabled. Other tools remain unaffected.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Network / Wi-Fi</strong></td>
+                                <td>Required to query current IP coordinates, compute pings, update widgets, and submit crash data.</td>
+                                <td>Ping diagnostic tools will fail to query endpoints. Offline services remain active.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Notifications</strong></td>
+                                <td>Triggers countdown events and ensures synchronization of active widgets.</td>
+                                <td>You will not receive expiration warnings. Widget updates may be throttled.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Photo Library / Save</strong></td>
+                                <td>Used to save ruler screenshots, custom poster prints, and exported mocks directly to Camera Roll.</td>
+                                <td>Cannot save images. Users must use iOS system screenshot feature.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="section" id="en-storage">
+                    <h2>5. Data Retention & Safeguards</h2>
+                    
+                    <h3>5.1 Retention Limits</h3>
+                    <ul>
+                        <li><strong>Local Sandbox Data:</strong> Files and settings saved locally remain permanently on your device unless you manually uninstall the App or erase system caches.</li>
+                        <li><strong>Diagnostic Log retention:</strong> Ping IP sessions are discarded instantly upon diagnostic completions. Telemetry data sent to Firebase is retained up to 90 days and cannot identify individual users.</li>
+                    </ul>
+
+                    <h3>5.2 Data Security Measures</h3>
+                    <p>We deploy standard security protocols to safeguard your inputs, including HTTPS TLS-encrypted pipelines for remote networks and App Sandbox separations. In case of unexpected breaches, we will initiate responsive protocols and report to relevant agencies in accordance with applicable laws.</p>
+                </section>
+
+                <section class="section" id="en-share">
+                    <h2>6. Third-Party & Cross-Border</h2>
+                    
+                    <h3>6.1 Telemetry SDK Details</h3>
+                    <table class="policy-table">
+                        <thead>
+                            <tr>
+                                <th>Provider Name</th>
+                                <th>Anonymous Data Category</th>
+                                <th>Purpose of Integration</th>
+                                <th>Privacy Link</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Google Firebase (Crashlytics)</td>
+                                <td>Crash dumps, device models, OS versions, random installation ID</td>
+                                <td>Diagnosing application errors and monitoring technical health</td>
+                                <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase Privacy Policy</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>6.2 Cross-Border Transfers</h3>
+                    <p>Because Firebase servers are located globally, we secure transfers by executing Standard Contractual Clauses (SCCs) to ensure equivalent protection standards for all exported data.</p>
+                </section>
+
+                <section class="section" id="en-rights">
+                    <h2>7. Your Data Subject Rights</h2>
+                    <p>Under GDPR or similar frameworks, you hold the following rights regarding your data:</p>
+                    <ul>
+                        <li><strong>Right of Access & Portability:</strong> Local records like NFC cache and countdown logs can be viewed and copied inside the App directly.</li>
+                        <li><strong>Right to Rectification:</strong> Edit details directly via update options in the corresponding item lists.</li>
+                        <li><strong>Right to Erasure ("Right to be Forgotten"):</strong> As all data is local, **uninstalling the App** permanently wipes out all sandboxed database entries. We do not keep logs to be deleted from remote servers.</li>
+                        <li><strong>Right to Withdraw Consent:</strong> You may toggle permission controls off under iOS "Settings" -> "Privacy" to revoke any previous authorization.</li>
+                    </ul>
+                </section>
+
+                <section class="section" id="en-children">
+                    <h2>8. Children's Privacy Compliance</h2>
+                    <p>The App is a utility tool designed for the general public. **We do not target or knowingly collect data from children under 14** (or equivalent legal age). If you are a minor, please use the App under the supervision of a parent or guardian. If we discover children's data collected without consent, we will delete it immediately.</p>
+                </section>
+
+                <section class="section" id="en-state">
+                    <h2>9. Jurisdiction-Specific Laws</h2>
+                    
+                    <h3>9.1 CCPA / CPRA Notice</h3>
+                    <p>We declare that in the past 12 months, we **have not sold or shared** user personal data for commercial purposes. You possess the right to seek data details, reject data sales, and request equal services free from discrimination.</p>
+
+                    <h3>9.2 GDPR / EEA notice</h3>
+                    <p>If you reside in the European Economic Area (EEA), we process personal data as a "Data Controller". You hold the right to lodge complaints with a supervisory authority in your home region.</p>
+                </section>
+
+                <section class="section" id="en-changes">
+                    <h2>10. Contact Details & Revisions</h2>
+                    <p>This Privacy Policy may change along with product updates. We will post any updates here and modify the "Last Updated" timestamp. For major revisions, we will display prominent pop-up notifications inside the App.</p>
+                    
+                    <p>For questions, contact us via email. To protect security, we may request verification of your device info before addressing your request.</p>
+                    <ul>
+                        <li><strong>Email:</strong> <a href="mailto:tendril_curved_5i@icloud.com" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">tendril_curved_5i@icloud.com</a></li>
+                        <li><strong>Response Time:</strong> We will review your request and reply or delete files within 15 business days after confirming your identity.</li>
+                    </ul>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 OmniTools. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function switchLang(lang) {
+            // 切换语言按钮激活状态
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 切换主要内容
+            document.querySelectorAll('.lang-section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            if (lang === 'zh') {
+                document.getElementById('content-zh').classList.add('active');
+                document.getElementById('sidebar-zh').classList.add('active');
+            } else {
+                document.getElementById('content-en').classList.add('active');
+                document.getElementById('sidebar-en').classList.add('active');
+            }
+
+            // 重新绑定滚动监听
+            setupScrollListener(lang);
+        }
+
+        // 简易目录滚动高亮逻辑
+        function setupScrollListener(lang) {
+            const prefix = lang === 'zh' ? 'zh-' : 'en-';
+            const links = document.querySelectorAll('#sidebar-' + lang + ' .toc-link');
+            const sections = document.querySelectorAll('#content-' + lang + ' .section');
+
+            function highlightTOC() {
+                let currentId = '';
+                sections.forEach(sec => {
+                    const sectionTop = sec.offsetTop;
+                    if (window.scrollY >= sectionTop - 120) {
+                        currentId = sec.getAttribute('id');
+                    }
+                });
+
+                links.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + currentId) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+
+            window.removeEventListener('scroll', window.currentScrollHandler);
+            window.currentScrollHandler = highlightTOC;
+            window.addEventListener('scroll', window.currentScrollHandler);
+        }
+
+        // 初始化
+        setupScrollListener('zh');
+
+        // 双向同步 TOC 滚动到对应段落
+        document.querySelectorAll('.toc-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetSec = document.querySelector(targetId);
+                if (targetSec) {
+                    window.scrollTo({
+                        top: targetSec.offsetTop - 90,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
