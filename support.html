@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技术支持与帮助中心 | Support - OmniTools</title>
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --primary-hover: #0056b3;
+            --bg-color: #ffffff;
+            --text-color: #1d1d1f;
+            --secondary-text: #6e6e73;
+            --border-color: #d2d2d7;
+            --card-bg: #f5f5f7;
+            --card-hover: #e8e8ed;
+            --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #161617;
+                --text-color: #f5f5f7;
+                --secondary-text: #86868b;
+                --border-color: #333336;
+                --card-bg: #1d1d1f;
+                --card-hover: #2d2d2f;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--apple-font);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 顶部导航 */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            header {
+                background: rgba(22, 22, 23, 0.8);
+            }
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .hero h1 {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #00C6FF 0%, #0072FF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--secondary-text);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* 快速联系面板 */
+        .contact-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 50px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .contact-card h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .contact-card p {
+            font-size: 15px;
+            color: var(--secondary-text);
+            margin-bottom: 20px;
+        }
+
+        .email-btn {
+            display: inline-block;
+            background: var(--primary-color);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .email-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        /* FAQ 部分 */
+        .faq-section {
+            margin-bottom: 50px;
+        }
+
+        .faq-section h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            border-bottom: 1.5px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .faq-group {
+            margin-bottom: 30px;
+        }
+
+        .faq-group h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .faq-item {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .faq-item:hover {
+            background: var(--card-hover);
+        }
+
+        .faq-question {
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-question::after {
+            content: "▼";
+            font-size: 12px;
+            color: var(--secondary-text);
+            transition: transform 0.2s ease;
+        }
+
+        .faq-item.active .faq-question::after {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            margin-top: 15px;
+            font-size: 14.5px;
+            color: var(--text-color);
+            opacity: 0.9;
+            display: none;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+        }
+
+        .faq-item.active .faq-answer {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--secondary-text);
+            font-size: 13.5px;
+            margin-top: 60px;
+        }
+
+        /* 英文切换链接 */
+        .toggle-lang-link {
+            font-size: 14px;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="logo">
+            <img src="assets/appicon.png" alt="OmniTools Logo">
+            <span>OmniTools</span>
+        </a>
+        <a href="#" class="toggle-lang-link" onclick="toggleLanguage(event)">English</a>
+    </header>
+
+    <div class="container">
+        
+        <!-- 中文版帮助中心 -->
+        <div id="lang-zh">
+            <div class="hero">
+                <h1>技术支持与帮助中心</h1>
+                <p>在使用 OmniTools 的过程中遇到问题？我们在这里为您提供全方位的支持与解答。</p>
+            </div>
+
+            <!-- 联系通道 -->
+            <div class="contact-card">
+                <h2>联系我们 (反馈与申诉)</h2>
+                <p>如果您遇到的 Bug 在下方未列出，或者对 App 有任何改进建议、合作意向，请直接给开发团队发送邮件。</p>
+                <a href="mailto:tendril_curved_5i@icloud.com" class="email-btn">发送电子邮件</a>
+                <p style="margin-top: 15px; font-size: 13px; color: var(--secondary-text);">
+                    服务邮箱：<strong>tendril_curved_5i@icloud.com</strong><br>
+                    我们承诺在收到邮件后的 <strong>24 小时内</strong> 给您答复。
+                </p>
+            </div>
+
+            <!-- FAQ -->
+            <div class="faq-section">
+                <h2>常见问题解答 (FAQ)</h2>
+
+                <div class="faq-group">
+                    <h3>📟 NFC 读写器相关问题</h3>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">1. 为什么我的 iPhone 无法读取 NFC 卡片？</div>
+                        <div class="faq-answer">
+                            请确认以下几点：<br>
+                            1. 确认您的 iPhone 支持 NFC 读写功能（iPhone 7 及以上机型均支持）。<br>
+                            2. 刷卡时，请将卡片贴在 <strong>iPhone 背部顶端摄像头区域</strong>（NFC 芯片位于背部顶部，而不是中间或底部）。<br>
+                            3. 本应用仅支持读取非加密的标准 NFC 协议卡片（如普通的 NDEF 电子标签、展示海报芯片等）。带有硬件级加密保护的卡片（如部分加密门禁卡、金融银行卡等）由于 iOS 系统权限限制，暂时无法读取或克隆。
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="faq-question">2. 写入 NFC 标签时提示“写入失败”或无响应？</div>
+                        <div class="faq-answer">
+                            1. 请确认您的 NFC 标签是**可写**的。部分标签是只读（Read-Only）标签，一次烧录后即锁定，无法进行二次覆盖写入。<br>
+                            2. 写入时请保持手机贴近标签，不要移动，直到界面弹出“写入成功”的打勾提示。<br>
+                            3. 避开金属物表面：金属外壳或背贴会严重干扰 NFC 信号，请尝试在木质或塑料平面上写入。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-group">
+                    <h3>📊 系统仪表盘与小组件问题</h3>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">1. 桌面小组件 (Widgets) 数据为什么没有实时更新？</div>
+                        <div class="faq-answer">
+                            iOS 系统的桌面小组件刷新机制由系统（iOS 内核）进行调度与限频。为了节省设备电池消耗，系统不允许小组件以每秒级的频率更新。<br>
+                            <strong>解决方案：</strong><br>
+                            - 本应用已采用智能刷新算法优化能耗。如果发现小组件卡死，请点击小组件，这会主动启动主 App 并强制同步刷新数据。<br>
+                            - 确保您的系统没有处于“低电量模式”下，这会进一步限制小组件刷新。
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="faq-question">2. 为什么 CPU 与内存的占用数值与第三方测试软件不完全一致？</div>
+                        <div class="faq-answer">
+                            不同应用计算 CPU/内存占用的底层接口或计算公式存在差异。本产品使用的是 Apple 官方推荐的标准内核性能接口（Mach Kernel APIs）。这些数据反映了真实的活跃物理内存（Active Memory）和活动线程数，是准确无误的。
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-group">
+                    <h3>🌐 网络诊断与测试问题</h3>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">1. 测速结果显示的网络带宽比我办的宽带套餐低？</div>
+                        <div class="faq-answer">
+                            网络测速受多种物理因素影响：<br>
+                            - <strong>Wi-Fi 频段</strong>：2.4G 频段的 Wi-Fi 最大速率有限，建议连接 5G 频段或 Wi-Fi 6 的路由器。<br>
+                            - <strong>测试节点</strong>：本应用会自动为您匹配距离最近、延迟最小的节点。若遇到节点拥堵，测速数据可能会偏低。您可以尝试更换测试时段重新检测。
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="faq-question">2. 为什么公共 IP 信息显示的位置不够精准？</div>
+                        <div class="faq-answer">
+                            IP 地理位置是通过公共 IP 库数据库（GeoIP Database）进行反查匹配的。由于运营商（如电信、联通、移动）会动态分配 IP 路由，IP 库的库数据可能会有几百米至几公里的物理误差或轻微延迟更新。这属于正常技术现象，非 App 本身故障。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 英文版帮助中心 -->
+        <div id="lang-en" style="display: none;">
+            <div class="hero">
+                <h1>Support & Help Center</h1>
+                <p>Encountering issues with OmniTools? We are here to offer guidance and address your questions.</p>
+            </div>
+
+            <!-- Contact Card -->
+            <div class="contact-card">
+                <h2>Contact Us & Support</h2>
+                <p>If you encounter bugs not resolved below, or wish to submit feedback and suggestions, please contact our dev team.</p>
+                <a href="mailto:tendril_curved_5i@icloud.com" class="email-btn">Send Email</a>
+                <p style="margin-top: 15px; font-size: 13px; color: var(--secondary-text);">
+                    Support Email: <strong>tendril_curved_5i@icloud.com</strong><br>
+                    We guarantee a written response within <strong>24 hours</strong>.
+                </p>
+            </div>
+
+            <!-- FAQ -->
+            <div class="faq-section">
+                <h2>Frequently Asked Questions (FAQ)</h2>
+
+                <div class="faq-group">
+                    <h3>📟 NFC Reader/Writer Questions</h3>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">1. Why won't my iPhone scan or read my NFC card?</div>
+                        <div class="faq-answer">
+                            Please check the following details:<br>
+                            1. Ensure your device is compatible (iPhone 7 and above native support).<br>
+                            2. Position the card near the **top-back camera area** (this is where the physical NFC antenna is located, not in the middle or bottom).<br>
+                            3. This utility only scans non-encrypted standard NFC tags (like standard NDEF labels). Hardware-encrypted smart cards (like bank cards or secure building credentials) cannot be cloned due to sandboxed OS constraints.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="faq-question">2. Why does it show "Write Failed" when configuring tags?</div>
+                        <div class="faq-answer">
+                            1. Confirm if the tag is writable. Many RFID/NFC tags are designated as read-only after their initial initialization and lock.<br>
+                            2. Keep the device steadily close to the tag until the "Success" confirmation checkmark appears.<br>
+                            3. Avoid metallic environments: Metal interference blocks RF signals. Write on non-metallic surfaces like plastic or wood.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-group">
+                    <h3>📊 System Dashboards & Home Widgets</h3>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">1. Why aren't my widgets updating in real-time?</div>
+                        <div class="faq-answer">
+                            iOS schedules widget refreshes at the OS level to optimize battery endurance. Immediate real-time rendering is restricted.<br>
+                            **Solution:**<br>
+                            - Tapping the widget will launch the App and force a data synchronization.<br>
+                            - Ensure that "Low Power Mode" is not enabled on your device.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="faq-question">2. Why are telemetry metrics slightly different from other apps?</div>
+                        <div class="faq-answer">
+                            Different tools adopt varied formula methodologies. We utilize standard Mach Kernel APIs recommended by Apple guidelines. These parameters reflect physical active threads and system-level loads accurately.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>&copy; 2026 OmniTools. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // FAQ 收起/展开交互
+        document.querySelectorAll('.faq-item').forEach(item => {
+            item.addEventListener('click', () => {
+                item.classList.toggle('active');
+            });
+        });
+
+        // 语言切换逻辑
+        let currentLang = 'zh';
+        function toggleLanguage(e) {
+            e.preventDefault();
+            const btn = e.target;
+            const zhDiv = document.getElementById('lang-zh');
+            const enDiv = document.getElementById('lang-en');
+
+            if (currentLang === 'zh') {
+                zhDiv.style.display = 'none';
+                enDiv.style.display = 'block';
+                btn.innerText = '中文';
+                currentLang = 'en';
+            } else {
+                zhDiv.style.display = 'block';
+                enDiv.style.display = 'none';
+                btn.innerText = 'English';
+                currentLang = 'zh';
+            }
+        }
+    </script>
+</body>
+</html>
