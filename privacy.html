@@ -243,17 +243,31 @@
         }
 
         /* 表格样式 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 20px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
         .policy-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
             font-size: 13.5px;
+            min-width: 600px;
         }
 
         .policy-table th, .policy-table td {
-            border: 1px solid var(--border-color);
-            padding: 12px;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
             text-align: left;
+        }
+
+        .policy-table tr:last-child td {
+            border-bottom: none;
         }
 
         .policy-table th {
@@ -295,11 +309,101 @@
             font-size: 13px;
         }
 
+        /* 移动端目录 */
+        .mobile-toc {
+            display: none;
+            position: sticky;
+            top: 63px; /* Header is sticky */
+            z-index: 99;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            width: 100%;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .mobile-toc {
+                background: rgba(22, 22, 23, 0.9);
+            }
+        }
+
+        .mobile-toc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--primary-color);
+            user-select: none;
+        }
+
+        .mobile-toc-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .mobile-toc.open .mobile-toc-arrow {
+            transform: rotate(180deg);
+        }
+
+        .mobile-toc-dropdown {
+            display: none;
+            max-height: 280px;
+            overflow-y: auto;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-color);
+        }
+
+        .mobile-toc.open .mobile-toc-dropdown {
+            display: block;
+        }
+
+        .mobile-toc-list {
+            list-style: none;
+            padding: 4px 0;
+        }
+
+        .mobile-toc-list li a {
+            display: block;
+            padding: 12px 20px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(0,0,0,0.03);
+            transition: background 0.15s ease;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .mobile-toc-list li a {
+                border-bottom: 1px solid rgba(255,255,255,0.03);
+            }
+        }
+
+        .mobile-toc-list li:last-child a {
+            border-bottom: none;
+        }
+
+        .mobile-toc-list li a:active {
+            background: var(--toc-hover);
+        }
+
         /* 响应式设计 */
         @media (max-width: 768px) {
+            header {
+                padding: 12px 20px;
+            }
+
+            .mobile-toc {
+                display: block;
+            }
+
             .container {
                 flex-direction: column;
-                padding: 20px;
+                padding: 20px 16px;
+                gap: 20px;
             }
 
             .sidebar {
@@ -308,10 +412,33 @@
 
             h1 {
                 font-size: 26px;
+                line-height: 1.3;
+            }
+
+            .update-date {
+                margin-bottom: 20px;
+                padding-bottom: 15px;
             }
 
             h2 {
                 font-size: 18px;
+                margin-top: 30px;
+                margin-bottom: 12px;
+            }
+
+            h3 {
+                font-size: 15px;
+                margin-top: 18px;
+            }
+
+            p, li {
+                font-size: 14px;
+                line-height: 1.6;
+            }
+
+            .alert-box {
+                padding: 14px 16px;
+                margin-bottom: 20px;
             }
         }
     </style>
@@ -328,6 +455,42 @@
             <button class="lang-btn" onclick="switchLang('en')">English</button>
         </div>
     </header>
+
+    <!-- 移动端目录下拉菜单 -->
+    <div class="mobile-toc">
+        <div class="mobile-toc-header" onclick="toggleMobileTOC()">
+            <span id="mobile-toc-current">1. 导言与合规声明</span>
+            <span class="mobile-toc-arrow">▼</span>
+        </div>
+        <div class="mobile-toc-dropdown">
+            <!-- 移动端中文目录 -->
+            <ul class="mobile-toc-list lang-section active" id="mobile-toc-list-zh">
+                <li><a href="#zh-intro" onclick="closeMobileTOC('1. 导言与合规声明')">1. 导言与合规声明</a></li>
+                <li><a href="#zh-collect" onclick="closeMobileTOC('2. 信息收集与使用详述')">2. 信息收集与使用详述</a></li>
+                <li><a href="#zh-legal" onclick="closeMobileTOC('3. 数据处理的合法性基础')">3. 数据处理的合法性基础</a></li>
+                <li><a href="#zh-permission" onclick="closeMobileTOC('4. 设备权限调用及控制')">4. 设备权限调用及控制</a></li>
+                <li><a href="#zh-storage" onclick="closeMobileTOC('5. 数据存储期限与安全防护')">5. 数据存储期限与安全防护</a></li>
+                <li><a href="#zh-share" onclick="closeMobileTOC('6. 第三方共享与数据跨境传输')">6. 第三方共享与数据跨境传输</a></li>
+                <li><a href="#zh-rights" onclick="closeMobileTOC('7. 您的个人信息主体权利')">7. 您的个人信息主体权利</a></li>
+                <li><a href="#zh-children" onclick="closeMobileTOC('8. 未成年人及儿童隐私保护')">8. 未成年人及儿童隐私保护</a></li>
+                <li><a href="#zh-state" onclick="closeMobileTOC('9. 特定法域特别条款')">9. 特定法域特别条款</a></li>
+                <li><a href="#zh-changes" onclick="closeMobileTOC('10. 政策更新与联系渠道')">10. 政策更新与联系渠道</a></li>
+            </ul>
+            <!-- 移动端英文目录 -->
+            <ul class="mobile-toc-list lang-section" id="mobile-toc-list-en">
+                <li><a href="#en-intro" onclick="closeMobileTOC('1. Intro & Compliance')">1. Intro & Compliance</a></li>
+                <li><a href="#en-collect" onclick="closeMobileTOC('2. Collection & Usage details')">2. Collection & Usage details</a></li>
+                <li><a href="#en-legal" onclick="closeMobileTOC('3. Legal Bases for Processing')">3. Legal Bases for Processing</a></li>
+                <li><a href="#en-permission" onclick="closeMobileTOC('4. Device Permissions Control')">4. Device Permissions Control</a></li>
+                <li><a href="#en-storage" onclick="closeMobileTOC('5. Data Retention & Safeguards')">5. Data Retention & Safeguards</a></li>
+                <li><a href="#en-share" onclick="closeMobileTOC('6. Third-Party & Cross-Border')">6. Third-Party & Cross-Border</a></li>
+                <li><a href="#en-rights" onclick="closeMobileTOC('7. Your Data Subject Rights')">7. Your Data Subject Rights</a></li>
+                <li><a href="#en-children" onclick="closeMobileTOC('8. Children\'s Privacy Compliance')">8. Children's Privacy Compliance</a></li>
+                <li><a href="#en-state" onclick="closeMobileTOC('9. Jurisdiction-Specific Laws')">9. Jurisdiction-Specific Laws</a></li>
+                <li><a href="#en-changes" onclick="closeMobileTOC('10. Contact Details & Revisions')">10. Contact Details & Revisions</a></li>
+            </ul>
+        </div>
+    </div>
 
     <div class="container">
         <!-- 侧边栏导航：中文版 -->
@@ -415,37 +578,39 @@
                     <h2>4. 设备权限调用及控制</h2>
                     <p>为了向您提供多维度的实用工具服务，本应用将在特定场景下向您的操作系统申请调用以下系统权限。我们在此披露其具体作用以及对应的控制方式：</p>
                     
-                    <table class="policy-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 25%;">系统权限</th>
-                                <th style="width: 50%;">具体调用目的/场景</th>
-                                <th style="width: 25%;">用户拒绝后的后果</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>NFC (近场通信)</strong></td>
-                                <td>用户主动触发 NFC 卡片扫描、信息读取与写入标签时调用 NFC 模块芯片。</td>
-                                <td>无法读取或烧录 NFC 标签，但不影响其他不相关工具使用。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>网络访问与蜂窝数据</strong></td>
-                                <td>用于获取当前公共 IP 信息、执行测速 Ping 测试、加载远程小组件内容及提交匿名闪退日志。</td>
-                                <td>无法进行网络检测及网络依赖的分析，单机本地功能仍可正常运行。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>通知权限 (Notification)</strong></td>
-                                <td>倒数日、纪念日到达临界值时的定时通知，以及后台小组件状态变更的通知推送。</td>
-                                <td>将不会收到事件提醒通知，小组件数据更新可能产生延迟。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>相册/写入存储 (Photos)</strong></td>
-                                <td>用于将用户生成的 App Store 截图导出海报、测量直尺截图直接保存到系统相册中。</td>
-                                <td>无法保存图片到相册。用户可通过截屏等方式替代，或再次授权开启。</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="policy-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%;">系统权限</th>
+                                    <th style="width: 50%;">具体调用目的/场景</th>
+                                    <th style="width: 25%;">用户拒绝后的后果</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>NFC (近场通信)</strong></td>
+                                    <td>用户主动触发 NFC 卡片扫描、信息读取与写入标签时调用 NFC 模块芯片。</td>
+                                    <td>无法读取或烧录 NFC 标签，但不影响其他不相关工具使用。</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>网络访问与蜂窝数据</strong></td>
+                                    <td>用于获取当前公共 IP 信息、执行测速 Ping 测试、加载远程小组件内容及提交匿名闪退日志。</td>
+                                    <td>无法进行网络检测及网络依赖的分析，单机本地功能仍可正常运行。</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>通知权限 (Notification)</strong></td>
+                                    <td>倒数日、纪念日到达临界值时的定时通知，以及后台小组件状态变更的通知推送。</td>
+                                    <td>将不会收到事件提醒通知，小组件数据更新可能产生延迟。</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>相册/写入存储 (Photos)</strong></td>
+                                    <td>用于将用户生成的 App Store 截图导出海报、测量直尺截图直接保存到系统相册中。</td>
+                                    <td>无法保存图片到相册。用户可通过截屏等方式替代，或再次授权开启。</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
 
                 <section class="section" id="zh-storage">
@@ -466,24 +631,26 @@
                     
                     <h3>6.1 第三方服务商列表</h3>
                     <p>本产品集成了以下第三方软件开发工具包（SDK），用于提升稳定性及排查漏洞，具体情况如下表：</p>
-                    <table class="policy-table">
-                        <thead>
-                            <tr>
-                                <th>服务商名称</th>
-                                <th>收集的匿名数据类型</th>
-                                <th>集成目的</th>
-                                <th>隐私政策链接</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Google Firebase (Crashlytics)</td>
-                                <td>崩溃日志、操作系统版本、设备型号、唯一随机安装 ID（不涉及 IMEI/IDFA 个人信息）</td>
-                                <td>分析软件闪退故障、监控线上版本的技术健康度</td>
-                                <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase 隐私条款</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="policy-table">
+                            <thead>
+                                <tr>
+                                    <th>服务商名称</th>
+                                    <th>收集的匿名数据类型</th>
+                                    <th>集成目的</th>
+                                    <th>隐私政策链接</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Google Firebase (Crashlytics)</td>
+                                    <td>崩溃日志、操作系统版本、设备型号、唯一随机安装 ID（不涉及 IMEI/IDFA 个人信息）</td>
+                                    <td>分析软件闪退故障、监控线上版本的技术健康度</td>
+                                    <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase 隐私条款</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <h3>6.2 数据跨境传输说明</h3>
                     <p>由于 Firebase 等分析工具的服务器位于美国等海外区域，为了保障数据跨境的安全，我们已与上述提供方签署了包含《标准合同条款》（SCCs）的服务协议，以确保您个人数据的出境处理享有不低于您所在法域的数据保护水平。</p>
@@ -575,37 +742,39 @@
                     <h2>4. Device Permissions Control</h2>
                     <p>To support all efficiency tools, the App may request access permissions under iOS. The table below lists their specific objectives:</p>
                     
-                    <table class="policy-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 25%;">Permission</th>
-                                <th style="width: 50%;">Usage Scenario</th>
-                                <th style="width: 25%;">Consequences of Denial</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>NFC</strong></td>
-                                <td>Required to scan, read, or write NFC tags and cards using physical chips.</td>
-                                <td>NFC reading and writing tools will be disabled. Other tools remain unaffected.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Network / Wi-Fi</strong></td>
-                                <td>Required to query current IP coordinates, compute pings, update widgets, and submit crash data.</td>
-                                <td>Ping diagnostic tools will fail to query endpoints. Offline services remain active.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Notifications</strong></td>
-                                <td>Triggers countdown events and ensures synchronization of active widgets.</td>
-                                <td>You will not receive expiration warnings. Widget updates may be throttled.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Photo Library / Save</strong></td>
-                                <td>Used to save ruler screenshots, custom poster prints, and exported mocks directly to Camera Roll.</td>
-                                <td>Cannot save images. Users must use iOS system screenshot feature.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="policy-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%;">Permission</th>
+                                    <th style="width: 50%;">Usage Scenario</th>
+                                    <th style="width: 25%;">Consequences of Denial</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>NFC</strong></td>
+                                    <td>Required to scan, read, or write NFC tags and cards using physical chips.</td>
+                                    <td>NFC reading and writing tools will be disabled. Other tools remain unaffected.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Network / Wi-Fi</strong></td>
+                                    <td>Required to query current IP coordinates, compute pings, update widgets, and submit crash data.</td>
+                                    <td>Ping diagnostic tools will fail to query endpoints. Offline services remain active.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Notifications</strong></td>
+                                    <td>Triggers countdown events and ensures synchronization of active widgets.</td>
+                                    <td>You will not receive expiration warnings. Widget updates may be throttled.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Photo Library / Save</strong></td>
+                                    <td>Used to save ruler screenshots, custom poster prints, and exported mocks directly to Camera Roll.</td>
+                                    <td>Cannot save images. Users must use iOS system screenshot feature.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
 
                 <section class="section" id="en-storage">
@@ -625,24 +794,26 @@
                     <h2>6. Third-Party & Cross-Border</h2>
                     
                     <h3>6.1 Telemetry SDK Details</h3>
-                    <table class="policy-table">
-                        <thead>
-                            <tr>
-                                <th>Provider Name</th>
-                                <th>Anonymous Data Category</th>
-                                <th>Purpose of Integration</th>
-                                <th>Privacy Link</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Google Firebase (Crashlytics)</td>
-                                <td>Crash dumps, device models, OS versions, random installation ID</td>
-                                <td>Diagnosing application errors and monitoring technical health</td>
-                                <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase Privacy Policy</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="policy-table">
+                            <thead>
+                                <tr>
+                                    <th>Provider Name</th>
+                                    <th>Anonymous Data Category</th>
+                                    <th>Purpose of Integration</th>
+                                    <th>Privacy Link</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Google Firebase (Crashlytics)</td>
+                                    <td>Crash dumps, device models, OS versions, random installation ID</td>
+                                    <td>Diagnosing application errors and monitoring technical health</td>
+                                    <td><a href="https://firebase.google.com/support/privacy" target="_blank" style="color: var(--primary-color);">Firebase Privacy Policy</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <h3>6.2 Cross-Border Transfers</h3>
                     <p>Because Firebase servers are located globally, we secure transfers by executing Standard Contractual Clauses (SCCs) to ensure equivalent protection standards for all exported data.</p>
@@ -694,12 +865,26 @@
     </footer>
 
     <script>
+        function toggleMobileTOC() {
+            document.querySelector('.mobile-toc').classList.toggle('open');
+        }
+
+        function closeMobileTOC(text) {
+            document.getElementById('mobile-toc-current').innerText = text;
+            document.querySelector('.mobile-toc').classList.remove('open');
+        }
+
         function switchLang(lang) {
             // 切换语言按钮激活状态
             document.querySelectorAll('.lang-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            // 激活对应语言的所有按钮（包括 desktop 和 mobile/other）
+            document.querySelectorAll(`.lang-btn`).forEach(btn => {
+                if (btn.getAttribute('onclick') === `switchLang('${lang}')`) {
+                    btn.classList.add('active');
+                }
+            });
 
             // 切换主要内容
             document.querySelectorAll('.lang-section').forEach(section => {
@@ -708,10 +893,14 @@
 
             if (lang === 'zh') {
                 document.getElementById('content-zh').classList.add('active');
-                document.getElementById('sidebar-zh').classList.add('active');
+                if (document.getElementById('sidebar-zh')) document.getElementById('sidebar-zh').classList.add('active');
+                if (document.getElementById('mobile-toc-list-zh')) document.getElementById('mobile-toc-list-zh').classList.add('active');
+                document.getElementById('mobile-toc-current').innerText = '1. 导言与合规声明';
             } else {
                 document.getElementById('content-en').classList.add('active');
-                document.getElementById('sidebar-en').classList.add('active');
+                if (document.getElementById('sidebar-en')) document.getElementById('sidebar-en').classList.add('active');
+                if (document.getElementById('mobile-toc-list-en')) document.getElementById('mobile-toc-list-en').classList.add('active');
+                document.getElementById('mobile-toc-current').innerText = '1. Intro & Compliance';
             }
 
             // 重新绑定滚动监听
@@ -722,23 +911,30 @@
         function setupScrollListener(lang) {
             const prefix = lang === 'zh' ? 'zh-' : 'en-';
             const links = document.querySelectorAll('#sidebar-' + lang + ' .toc-link');
+            const mobileLinks = document.querySelectorAll('#mobile-toc-list-' + lang + ' a');
             const sections = document.querySelectorAll('#content-' + lang + ' .section');
 
             function highlightTOC() {
                 let currentId = '';
                 sections.forEach(sec => {
                     const sectionTop = sec.offsetTop;
-                    if (window.scrollY >= sectionTop - 120) {
+                    if (window.scrollY >= sectionTop - 130) {
                         currentId = sec.getAttribute('id');
                     }
                 });
 
+                let activeText = '';
                 links.forEach(link => {
                     link.classList.remove('active');
                     if (link.getAttribute('href') === '#' + currentId) {
                         link.classList.add('active');
+                        activeText = link.innerText;
                     }
                 });
+
+                if (activeText) {
+                    document.getElementById('mobile-toc-current').innerText = activeText;
+                }
             }
 
             window.removeEventListener('scroll', window.currentScrollHandler);
@@ -750,14 +946,14 @@
         setupScrollListener('zh');
 
         // 双向同步 TOC 滚动到对应段落
-        document.querySelectorAll('.toc-link').forEach(link => {
+        document.querySelectorAll('.toc-link, .mobile-toc-list a').forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
                 const targetId = this.getAttribute('href');
                 const targetSec = document.querySelector(targetId);
                 if (targetSec) {
                     window.scrollTo({
-                        top: targetSec.offsetTop - 90,
+                        top: targetSec.offsetTop - 110,
                         behavior: 'smooth'
                     });
                 }

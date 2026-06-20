@@ -227,12 +227,110 @@
             margin-top: 60px;
         }
 
-        /* 英文切换链接 */
-        .toggle-lang-link {
+        /* 语言切换器 */
+        .lang-switch {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .lang-btn {
+            border: none;
+            background: none;
+            padding: 6px 16px;
             font-size: 14px;
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 500;
+            font-weight: 600;
+            border-radius: 16px;
+            cursor: pointer;
+            color: var(--secondary-text);
+            transition: all 0.2s ease;
+        }
+
+        .lang-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            header {
+                padding: 12px 16px;
+            }
+
+            .container {
+                padding: 20px 16px;
+            }
+
+            .hero {
+                padding: 25px 0 15px 0;
+            }
+
+            .hero h1 {
+                font-size: 28px;
+                letter-spacing: -0.5px;
+            }
+
+            .hero p {
+                font-size: 15px;
+                line-height: 1.5;
+            }
+
+            .contact-card {
+                padding: 20px 16px;
+                margin-bottom: 30px;
+                border-radius: 12px;
+            }
+
+            .contact-card h2 {
+                font-size: 18px;
+            }
+
+            .contact-card p {
+                font-size: 14px;
+                margin-bottom: 15px;
+            }
+
+            .email-btn {
+                padding: 10px 24px;
+                font-size: 15px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .faq-section h2 {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+
+            .faq-group h3 {
+                font-size: 16px;
+                margin-bottom: 12px;
+            }
+
+            .faq-item {
+                padding: 16px;
+                border-radius: 10px;
+            }
+
+            .faq-question {
+                font-size: 14px;
+                line-height: 1.4;
+            }
+
+            .faq-answer {
+                font-size: 13.5px;
+                line-height: 1.5;
+                padding-top: 12px;
+                margin-top: 12px;
+            }
+
+            footer {
+                padding: 30px 16px;
+                margin-top: 40px;
+                font-size: 12.5px;
+            }
         }
     </style>
 </head>
@@ -243,7 +341,10 @@
             <img src="assets/appicon.png" alt="OmniTools Logo">
             <span>OmniTools</span>
         </a>
-        <a href="#" class="toggle-lang-link" onclick="toggleLanguage(event)">English</a>
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+            <button class="lang-btn" onclick="switchLang('en')">English</button>
+        </div>
     </header>
 
     <div class="container">
@@ -419,23 +520,26 @@
         });
 
         // 语言切换逻辑
-        let currentLang = 'zh';
-        function toggleLanguage(e) {
-            e.preventDefault();
-            const btn = e.target;
+        function switchLang(lang) {
+            // 切换语言按钮激活状态
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll(`.lang-btn`).forEach(btn => {
+                if (btn.getAttribute('onclick') === `switchLang('${lang}')`) {
+                    btn.classList.add('active');
+                }
+            });
+
             const zhDiv = document.getElementById('lang-zh');
             const enDiv = document.getElementById('lang-en');
 
-            if (currentLang === 'zh') {
-                zhDiv.style.display = 'none';
-                enDiv.style.display = 'block';
-                btn.innerText = '中文';
-                currentLang = 'en';
-            } else {
+            if (lang === 'zh') {
                 zhDiv.style.display = 'block';
                 enDiv.style.display = 'none';
-                btn.innerText = 'English';
-                currentLang = 'zh';
+            } else {
+                zhDiv.style.display = 'none';
+                enDiv.style.display = 'block';
             }
         }
     </script>
